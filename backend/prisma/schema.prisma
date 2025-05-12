@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Roles {
+  ADMIN
+  VENDOR
+  USER
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+model Users {
+  id                          String        @id @default(uuid())
+  name                        String
+  email                       String        @unique
+  username                    String?        @unique
+  profile_picture             String?
+  roles                       Roles[]
+  password                    String
+  account_status               AccountStatus @default(ACTIVE)
+  verification_code           String?
+  incorect_attempt            Int?
+  retry_timestamp              DateTime?
+  vefification_hash           String?   @unique
+  verification_code_expire_at DateTime?
+  is_verified                 Boolean
+  // relationships
+  Sessions                    Sessions[]
+
+  //createdat - updatedat
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Sessions {
+  id            String    @id @default(uuid())
+  user_id       String
+  token         String    @unique @db.Text
+  ip_address    String?
+  user_agent    String?   @db.Text
+  last_activity DateTime?
+  //relationships
+  Users         Users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  //createdat - expires_at
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+
