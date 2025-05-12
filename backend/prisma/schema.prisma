@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -19,25 +20,272 @@ enum AccountStatus {
   DEACTIVATED
 }
 
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum AddressType {
+  HOME
+  WORK
+  OTHER
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+  RAZORPAY
+  PAYPAL
+  PAYTM
+  OTHER
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  WALLET
+  NET_BANKING
+  COD
+  OTHER
+}
+
+enum Size {
+  XS
+  S
+  M
+  L
+  XL
+  XXL
+  XXXL
+  FREE_SIZE
+  CUSTOM
+}
+
+enum FabricType {
+  COTTON
+  POLYESTER
+  LINEN
+  SILK
+  WOOL
+  RAYON
+  DENIM
+  JERSEY
+  CHIFFON
+  SATIN
+  VELVET
+  LEATHER
+  SUEDE
+  NYLON
+  SPANDEX
+  MODAL
+  CASHMERE
+  FLEECE
+  TWILL
+  OTHER
+}
+
+enum FabricCare {
+  MACHINE_WASH
+  HAND_WASH
+  DRY_CLEAN
+  SPOT_CLEAN
+  AIR_DRY
+  TUMBLE_DRY
+  IRON_LOW
+  IRON_MEDIUM
+  IRON_HIGH
+  DO_NOT_IRON
+  DO_NOT_BLEACH
+  DO_NOT_TUMBLE_DRY
+  OTHER
+}
+
+enum PatternType {
+  SOLID
+  STRIPED
+  CHECKED
+  PLAID
+  FLORAL
+  POLKA_DOT
+  CHEVRON
+  GEOMETRIC
+  ANIMAL_PRINT
+  CAMOUFLAGE
+  PAISLEY
+  ABSTRACT
+  GRAPHIC
+  ETHNIC
+  OTHER
+}
+
+enum FitType {
+  SLIM
+  REGULAR
+  RELAXED
+  OVERSIZED
+  SKINNY
+  STRAIGHT
+  BOOTCUT
+  TAPERED
+  WIDE_LEG
+  ATHLETIC
+  BOXY
+  TAILORED
+  OTHER
+}
+
+enum NeckType {
+  CREW_NECK
+  V_NECK
+  ROUND_NECK
+  SCOOP_NECK
+  BOAT_NECK
+  TURTLE_NECK
+  MOCK_NECK
+  COLLARED
+  POLO
+  HENLEY
+  HALTER
+  COWL_NECK
+  OFF_SHOULDER
+  SWEETHEART
+  OTHER
+}
+
+enum SleeveType {
+  SLEEVELESS
+  SHORT_SLEEVE
+  THREE_QUARTER
+  LONG_SLEEVE
+  CAP_SLEEVE
+  ROLL_UP
+  BELL_SLEEVE
+  PUFF_SLEEVE
+  RAGLAN
+  DOLMAN
+  KIMONO
+  BATWING
+  DROP_SHOULDER
+  OTHER
+}
+
+enum Occasion {
+  CASUAL
+  FORMAL
+  BUSINESS
+  PARTY
+  WEDDING
+  SPORTS
+  BEACH
+  TRAVEL
+  FESTIVAL
+  LOUNGE
+  MATERNITY
+  WORKWEAR
+  NIGHT_OUT
+  EVERYDAY
+  OTHER
+}
+
+//Country of Origin is set to India by default
+
+// Category model for flexible hierarchical categorization
+model Category {
+  id            String     @id @default(uuid())
+  name          String     
+  description   String?    @db.Text
+  slug          String     @unique
+  image         String?
+  parent_id     String?
+  parent        Category?  @relation("SubCategories", fields: [parent_id], references: [id], onDelete: SetNull)
+  children      Category[] @relation("SubCategories")
+  products      Product[]
+  level         Int        @default(1) // 1 = main category, 2 = subcategory, 3 = sub-subcategory
+  active        Boolean    @default(true)
+  sort_order    Int        @default(0)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+}
+
+// Attribute model for flexible product attributes
+model Attribute {
+  id           String         @id @default(uuid())
+  name         String         @unique
+  description  String?        @db.Text
+  type         String         @default("string") // string, number, boolean, date
+  values       AttributeValue[]
+  created_at   DateTime       @default(now())
+  updated_at   DateTime       @updatedAt
+}
+
+model AttributeValue {
+  id            String     @id @default(uuid())
+  attribute_id  String
+  value         String
+  display_value String?
+  sort_order    Int        @default(0)
+  
+  attribute     Attribute  @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
+  
+  products      ProductAttributeValue[]
+
+  @@unique([attribute_id, value])
+}
+
+model ProductAttributeValue {
+  product_id         String
+  attribute_value_id String
+  
+  product        Product        @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  attributeValue AttributeValue @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade)
+  
+  @@id([product_id, attribute_value_id])
+}
+
 model Users {
-  id                          String        @id @default(uuid())
+  id                          String          @id @default(uuid())
   name                        String
-  email                       String        @unique
-  username                    String?        @unique
+  email                       String          @unique
+  username                    String?         @unique
   profile_picture             String?
   roles                       Roles[]
   password                    String
-  account_status               AccountStatus @default(ACTIVE)
+  account_status              AccountStatus   @default(ACTIVE)
   verification_code           String?
   incorect_attempt            Int?
-  retry_timestamp              DateTime?
-  vefification_hash           String?   @unique
+  retry_timestamp             DateTime?
+  vefification_hash           String?         @unique
   verification_code_expire_at DateTime?
   is_verified                 Boolean
-  // relationships
+  // Relationships
   Sessions                    Sessions[]
+  Addresses                   Address[]
+  Orders                      Order[]
+  CartItems                   CartItem[]
+  Wishlists                   Wishlist[]
+  Products                    Product[]       @relation("VendorProducts")
+  Reviews                     ProductReview[]
+  Vendor                      Vendor?
+  Payment                     Payment[]
 
-  //createdat - updatedat
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
@@ -49,12 +297,200 @@ model Sessions {
   ip_address    String?
   user_agent    String?   @db.Text
   last_activity DateTime?
-  //relationships
+  expires_at    DateTime
+  created_at    DateTime  @default(now())
+  
   Users         Users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  //createdat - expires_at
-  expires_at DateTime
-  created_at DateTime @default(now())
 }
 
+model Vendor {
+  id              String       @id @default(uuid())
+  user_id         String       @unique
+  gst_number      String       @unique
+  pan_number      String       @unique
+  shop_name       String
+  shop_address    String
+  phone_number    String
+  status          VendorStatus @default(PENDING)
+  
+  User            Users        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Products        Product[]
 
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+}
+
+model Address {
+  id           String      @id @default(uuid())
+  user_id      String
+  full_name    String
+  phone        String
+  pincode      String
+  house_no     String
+  area         String
+  landmark     String?
+  city         String
+  state        String
+  address_type AddressType @default(HOME)
+
+  Users        Users       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Orders       Order[]
+}
+
+model Product {
+  id              String      @id @default(uuid())
+  title           String
+  description     String
+  price           Float
+  vendor_id       String
+  images          String[]    // Array of image URLs
+  
+  // Apparel specific fields
+  material        String?
+  brand           String?
+  gender          String?
+  season          String?
+  weight          Float?      // in grams
+  
+  // Category relation replacing enum
+  category_id     String?
+  category        Category?   @relation(fields: [category_id], references: [id])
+  
+  // Product attributes
+  attributeValues ProductAttributeValue[]
+  
+  // Other relations
+  Vendor          Vendor      @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
+  OrderItems      OrderItem[]
+  CartItems       CartItem[]
+  Wishlists       Wishlist[]
+  Inventory       Inventory[]
+  Variations      ProductVariation[]
+  Reviews         ProductReview[]
+  ApparelDetails  ApparelDetails?
+  Users           Users[]     @relation("VendorProducts")
+}
+
+model ProductVariation {
+  id          String    @id @default(uuid())
+  product_id  String
+  size        Size
+  color       String
+  stock       Int
+  sku         String?   // Stock Keeping Unit
+  price_mod   Float?    // Price modifier (can be positive or negative)
+  images      String[]  // Specific images for this variation
+  
+  Product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  
+  @@unique([product_id, size, color])
+}
+
+model Inventory {
+  id           String    @id @default(uuid())
+  product_id   String
+  quantity     Int
+  last_updated DateTime  @default(now())
+
+  Product      Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  user_id       String
+  address_id    String
+  total_amount  Float
+  status        OrderStatus @default(PENDING)
+  created_at    DateTime    @default(now())
+
+  Users         Users       @relation(fields: [user_id], references: [id])
+  Address       Address     @relation(fields: [address_id], references: [id])
+  OrderItems    OrderItem[]
+  Payment       Payment?
+}
+
+model OrderItem {
+  id                 String   @id @default(uuid())
+  order_id           String
+  product_id         String
+  quantity           Int
+  price              Float
+  size               Size?    // Size of the product if applicable
+  color              String?  // Color of the product if applicable 
+
+  Order              Order    @relation(fields: [order_id], references: [id])
+  Product            Product  @relation(fields: [product_id], references: [id])
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  user_id    String
+  product_id String
+  quantity   Int
+  size       Size?    // Size of the product if applicable
+  color      String?  // Color of the product if applicable
+
+  Users      Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+}
+
+model Wishlist {
+  id         String   @id @default(uuid())
+  user_id    String
+  product_id String
+
+  Users      Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+}
+
+model ProductReview {
+  id         String   @id @default(uuid())
+  product_id String
+  user_id    String
+  rating     Int      @default(5) // 1 to 5
+  review     String?  @db.Text
+  images     String[] // User uploaded images with review
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  Product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  Users      Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([product_id, user_id]) // One review per user per product
+}
+
+model ApparelDetails {
+  id                String           @id @default(uuid())
+  product_id        String           @unique
+  fabric_type       FabricType?
+  fabric_care       FabricCare?
+  pattern           PatternType?
+  fit_type          FitType?
+  neck_type         NeckType?
+  sleeve_type       SleeveType?
+  occasion          Occasion?
+  country_of_origin String           @default("INDIA")
+  
+  // Additional details
+  wash_instruction  String?
+  manufacturing_date DateTime?
+  
+  Product           Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id             String          @id @default(uuid())
+  order_id       String          @unique
+  user_id        String
+  provider       PaymentProvider
+  payment_id     String          @unique 
+  amount         Float
+  currency       String          @default("INR")
+  status         PaymentStatus   @default(PENDING) 
+  method         PaymentMethod?
+  created_at     DateTime        @default(now())
+  paid_at        DateTime?
+  
+  Order          Order           @relation(fields: [order_id], references: [id])
+  Users          Users           @relation(fields: [user_id], references: [id])
+}
