@@ -24,9 +24,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKey: configService.get('JWT_ACCESS_SECRET'),
     });
   }
-
   async validate(payload: any) {
-    const user = await this.userRepositories.findUserById(payload.sub);
+    // Using payload.id instead of payload.sub because that's how we store it in CreateAccessToken
+    const user = await this.userRepositories.findUserById(payload.id);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

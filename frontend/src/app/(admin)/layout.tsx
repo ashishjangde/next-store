@@ -9,10 +9,10 @@ function VendorLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="overflow-hidden w-full">
+    <div className="overflow-hidden w-full h-full">
       <SideBarIndex>
         <div className="relative w-full">
-          <ScrollArea className="h-[calc(100vh-64px)] w-full">
+          <ScrollArea className="md:h-[calc(100vh-64px)] w-full">
             <div className="p-2">
               {children}
               </div>

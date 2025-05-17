@@ -1,4 +1,3 @@
-import { ApiResponse } from "@/app/types";
 import axios from "axios";
 import { axiosInstance } from "@/hooks/custom-axios-interceptor";
 

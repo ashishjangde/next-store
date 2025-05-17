@@ -67,160 +67,20 @@ enum PaymentMethod {
   OTHER
 }
 
-enum Size {
-  XS
-  S
-  M
-  L
-  XL
-  XXL
-  XXXL
-  FREE_SIZE
-  CUSTOM
-}
 
-enum FabricType {
-  COTTON
-  POLYESTER
-  LINEN
-  SILK
-  WOOL
-  RAYON
-  DENIM
-  JERSEY
-  CHIFFON
-  SATIN
-  VELVET
-  LEATHER
-  SUEDE
-  NYLON
-  SPANDEX
-  MODAL
-  CASHMERE
-  FLEECE
-  TWILL
-  OTHER
-}
-
-enum FabricCare {
-  MACHINE_WASH
-  HAND_WASH
-  DRY_CLEAN
-  SPOT_CLEAN
-  AIR_DRY
-  TUMBLE_DRY
-  IRON_LOW
-  IRON_MEDIUM
-  IRON_HIGH
-  DO_NOT_IRON
-  DO_NOT_BLEACH
-  DO_NOT_TUMBLE_DRY
-  OTHER
-}
-
-enum PatternType {
-  SOLID
-  STRIPED
-  CHECKED
-  PLAID
-  FLORAL
-  POLKA_DOT
-  CHEVRON
-  GEOMETRIC
-  ANIMAL_PRINT
-  CAMOUFLAGE
-  PAISLEY
-  ABSTRACT
-  GRAPHIC
-  ETHNIC
-  OTHER
-}
-
-enum FitType {
-  SLIM
-  REGULAR
-  RELAXED
-  OVERSIZED
-  SKINNY
-  STRAIGHT
-  BOOTCUT
-  TAPERED
-  WIDE_LEG
-  ATHLETIC
-  BOXY
-  TAILORED
-  OTHER
-}
-
-enum NeckType {
-  CREW_NECK
-  V_NECK
-  ROUND_NECK
-  SCOOP_NECK
-  BOAT_NECK
-  TURTLE_NECK
-  MOCK_NECK
-  COLLARED
-  POLO
-  HENLEY
-  HALTER
-  COWL_NECK
-  OFF_SHOULDER
-  SWEETHEART
-  OTHER
-}
-
-enum SleeveType {
-  SLEEVELESS
-  SHORT_SLEEVE
-  THREE_QUARTER
-  LONG_SLEEVE
-  CAP_SLEEVE
-  ROLL_UP
-  BELL_SLEEVE
-  PUFF_SLEEVE
-  RAGLAN
-  DOLMAN
-  KIMONO
-  BATWING
-  DROP_SHOULDER
-  OTHER
-}
-
-enum Occasion {
-  CASUAL
-  FORMAL
-  BUSINESS
-  PARTY
-  WEDDING
-  SPORTS
-  BEACH
-  TRAVEL
-  FESTIVAL
-  LOUNGE
-  MATERNITY
-  WORKWEAR
-  NIGHT_OUT
-  EVERYDAY
-  OTHER
-}
 
 //Country of Origin is set to India by default
 
-// Category model for flexible hierarchical categorization
+// Category model specifically designed for clothing/apparel hierarchy
 model Category {
   id            String     @id @default(uuid())
   name          String     
   description   String?    @db.Text
   slug          String     @unique
   image         String?
-  parent_id     String?
-  parent        Category?  @relation("SubCategories", fields: [parent_id], references: [id], onDelete: SetNull)
-  children      Category[] @relation("SubCategories")
   products      Product[]
-  level         Int        @default(1) // 1 = main category, 2 = subcategory, 3 = sub-subcategory
+  is_featured    Boolean    @default(false)
   active        Boolean    @default(true)
-  sort_order    Int        @default(0)
   created_at    DateTime   @default(now())
   updated_at    DateTime   @updatedAt
 }
@@ -241,7 +101,6 @@ model AttributeValue {
   attribute_id  String
   value         String
   display_value String?
-  sort_order    Int        @default(0)
   
   attribute     Attribute  @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
   
@@ -346,11 +205,12 @@ model Product {
   images          String[]    // Array of image URLs
   
   // Apparel specific fields
-  material        String?
   brand           String?
-  gender          String?
-  season          String?
+  gender          String?     // Men's, Women's, Unisex, Kids
+  season          String?     // Summer, Winter, Monsoon, All Season
   weight          Float?      // in grams
+  color_name      String?     // Primary color name (e.g., "Navy Blue")
+  color_family    String?     // Color family for filtering (e.g., "Blue")
   
   // Category relation replacing enum
   category_id     String?
@@ -367,14 +227,12 @@ model Product {
   Inventory       Inventory[]
   Variations      ProductVariation[]
   Reviews         ProductReview[]
-  ApparelDetails  ApparelDetails?
   Users           Users[]     @relation("VendorProducts")
 }
 
 model ProductVariation {
   id          String    @id @default(uuid())
   product_id  String
-  size        Size
   color       String
   stock       Int
   sku         String?   // Stock Keeping Unit
@@ -383,7 +241,7 @@ model ProductVariation {
   
   Product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
   
-  @@unique([product_id, size, color])
+  @@unique([product_id, color])
 }
 
 model Inventory {
@@ -414,10 +272,7 @@ model OrderItem {
   order_id           String
   product_id         String
   quantity           Int
-  price              Float
-  size               Size?    // Size of the product if applicable
-  color              String?  // Color of the product if applicable 
-
+  price              Float    
   Order              Order    @relation(fields: [order_id], references: [id])
   Product            Product  @relation(fields: [product_id], references: [id])
 }
@@ -427,9 +282,6 @@ model CartItem {
   user_id    String
   product_id String
   quantity   Int
-  size       Size?    // Size of the product if applicable
-  color      String?  // Color of the product if applicable
-
   Users      Users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
   Product    Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
 }
@@ -459,24 +311,7 @@ model ProductReview {
   @@unique([product_id, user_id]) // One review per user per product
 }
 
-model ApparelDetails {
-  id                String           @id @default(uuid())
-  product_id        String           @unique
-  fabric_type       FabricType?
-  fabric_care       FabricCare?
-  pattern           PatternType?
-  fit_type          FitType?
-  neck_type         NeckType?
-  sleeve_type       SleeveType?
-  occasion          Occasion?
-  country_of_origin String           @default("INDIA")
-  
-  // Additional details
-  wash_instruction  String?
-  manufacturing_date DateTime?
-  
-  Product           Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
-}
+
 
 model Payment {
   id             String          @id @default(uuid())

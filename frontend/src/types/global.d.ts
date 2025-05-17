@@ -1,10 +1,10 @@
-export interface ApiResponse<T> {
+interface ApiResponse<T> {
     localDateTime : Date
     data? : T
     apiError? : ApiError
 }
 
-export interface ApiError {
+interface ApiError {
     statusCode : number
     message : string
     errors : {
@@ -12,7 +12,12 @@ export interface ApiError {
     }
 }
 
-export interface IUser{
+
+
+
+
+
+interface IUser{
     id : string
     name : string
     email : string

@@ -1,4 +1,3 @@
-import { ApiResponse, IUser } from "@/app/types";
 import { 
   CreateUserInput, 
   LoginInput, 
@@ -6,7 +5,7 @@ import {
   ForgotPassowrdInput,
   VerifiyVerificationCodeSchema,
   ResetPasswordInput
-} from "@/schema/auth/create-user-schema";
+} from "@/schema/auth-schema";
 import { axiosInstance } from "@/hooks/custom-axios-interceptor";
 import axios from "axios";
 import { BACKEND_URL } from "@/constants/constants";

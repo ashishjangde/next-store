@@ -61,25 +61,6 @@ const data = {
       ],
     },
     {
-      title: "Products",
-      url: "/admin/dashboard/products",
-      icon: Package,
-      items: [
-        {
-          title: "All Products",
-          url: "/admin/dashboard/products",
-        },
-        {
-          title: "Add Product",
-          url: "/admin/dashboard/products/new",
-        },
-        {
-          title: "Product Reviews",
-          url: "/admin/dashboard/products/reviews",
-        },
-      ],
-    },
-    {
       title: "Categories",
       url: "/admin/dashboard/categories",
       icon: Tag,
@@ -99,33 +80,6 @@ const data = {
       ],
     },
     {
-      title: "Orders",
-      url: "/admin/dashboard/orders",
-      icon: ShoppingCart,
-      items: [
-        {
-          title: "All Orders",
-          url: "/admin/dashboard/orders",
-        },
-        {
-          title: "Pending Orders",
-          url: "/admin/dashboard/orders/pending",
-        },
-        {
-          title: "Processing Orders",
-          url: "/admin/dashboard/orders/processing",
-        },
-        {
-          title: "Completed Orders",
-          url: "/admin/dashboard/orders/completed",
-        },
-        {
-          title: "Cancelled Orders",
-          url: "/admin/dashboard/orders/cancelled",
-        },
-      ],
-    },
-    {
       title: "Vendors",
       url: "/admin/dashboard/vendors",
       icon: Store,
@@ -133,10 +87,6 @@ const data = {
         {
           title: "All Vendors",
           url: "/admin/dashboard/vendors",
-        },
-        {
-          title: "Pending Approvals",
-          url: "/admin/dashboard/vendors/pending",
         },
         {
           title: "Vendor Payouts",
@@ -160,25 +110,6 @@ const data = {
         {
           title: "User Roles",
           url: "/admin/dashboard/users/roles",
-        },
-      ],
-    },
-    {
-      title: "Returns & Refunds",
-      url: "/admin/dashboard/returns",
-      icon: RefreshCcw,
-      items: [
-        {
-          title: "Return Requests",
-          url: "/admin/dashboard/returns/requests",
-        },
-        {
-          title: "Processed Returns",
-          url: "/admin/dashboard/returns/processed",
-        },
-        {
-          title: "Refund History",
-          url: "/admin/dashboard/returns/refunds",
         },
       ],
     },
@@ -217,33 +148,6 @@ const data = {
         {
           title: "FAQs",
           url: "/admin/dashboard/content/faqs",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "/admin/dashboard/settings",
-      icon: Settings2,
-      items: [
-        {
-          title: "General Settings",
-          url: "/admin/dashboard/settings/general",
-        },
-        {
-          title: "Payment Methods",
-          url: "/admin/dashboard/settings/payments",
-        },
-        {
-          title: "Shipping Options",
-          url: "/admin/dashboard/settings/shipping",
-        },
-        {
-          title: "Email Templates",
-          url: "/admin/dashboard/settings/emails",
-        },
-        {
-          title: "Tax Configuration",
-          url: "/admin/dashboard/settings/taxes",
         },
       ],
     },
