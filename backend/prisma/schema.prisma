@@ -78,11 +78,33 @@ model Category {
   description   String?    @db.Text
   slug          String     @unique
   image         String?
-  products      Product[]
-  is_featured    Boolean    @default(false)
+  is_featured   Boolean    @default(false)
   active        Boolean    @default(true)
   created_at    DateTime   @default(now())
   updated_at    DateTime   @updatedAt
+
+  // Parent-Child relationship
+  parent_id     String?                                     
+  parent        Category?   @relation("CategoryHierarchy", fields: [parent_id], references: [id], onDelete: SetNull)
+  children      Category[]  @relation("CategoryHierarchy")   
+
+  // Products
+  products      Product[]
+  
+  // Attributes associated with this category
+  attributes    CategoryAttribute[]
+}
+
+// Junction model for Category-Attribute many-to-many relationship
+model CategoryAttribute {
+  category_id   String
+  attribute_id  String
+  required      Boolean  @default(false)  // Add this field for validation purposes
+
+  category      Category  @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  attribute     Attribute @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
+
+  @@id([category_id, attribute_id])
 }
 
 // Attribute model for flexible product attributes
@@ -92,6 +114,10 @@ model Attribute {
   description  String?        @db.Text
   type         String         @default("string") // string, number, boolean, date
   values       AttributeValue[]
+  
+  // Categories that use this attribute
+  categories   CategoryAttribute[]
+
   created_at   DateTime       @default(now())
   updated_at   DateTime       @updatedAt
 }
@@ -200,6 +226,7 @@ model Product {
   id              String      @id @default(uuid())
   title           String
   description     String
+  sku             String?     // Stock Keeping Unit
   price           Float
   vendor_id       String
   images          String[]    // Array of image URLs
@@ -212,11 +239,15 @@ model Product {
   color_name      String?     // Primary color name (e.g., "Navy Blue")
   color_family    String?     // Color family for filtering (e.g., "Blue")
   
+  // Archiving and soft deletion
+  is_active       Boolean     @default(true)
+  archived        Boolean     @default(false)
+  archived_at     DateTime?
+  
   // Category relation replacing enum
   category_id     String?
   category        Category?   @relation(fields: [category_id], references: [id])
-  
-  // Product attributes
+    // Product attributes
   attributeValues ProductAttributeValue[]
   
   // Other relations
@@ -224,7 +255,8 @@ model Product {
   OrderItems      OrderItem[]
   CartItems       CartItem[]
   Wishlists       Wishlist[]
-  Inventory       Inventory[]
+  Inventory       Inventory?  // A product has only base inventory now
+  VariationInventory VariationInventory[] // New relation for variation-specific inventory
   Variations      ProductVariation[]
   Reviews         ProductReview[]
   Users           Users[]     @relation("VendorProducts")
@@ -233,24 +265,41 @@ model Product {
 model ProductVariation {
   id          String    @id @default(uuid())
   product_id  String
+  size        String    
   color       String
-  stock       Int
-  sku         String?   // Stock Keeping Unit
-  price_mod   Float?    // Price modifier (can be positive or negative)
-  images      String[]  // Specific images for this variation
-  
+  sku         String?   
+  price_mod   Float?    
+  images      String[]  
   Product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  Inventory   VariationInventory? // Each variation has its own inventory
   
-  @@unique([product_id, color])
+  @@unique([product_id, size, color])
 }
 
+
+// Base inventory for product (main stock)
 model Inventory {
   id           String    @id @default(uuid())
-  product_id   String
+  product_id   String    @unique // One inventory per product
   quantity     Int
+  low_stock_threshold Int @default(10)
   last_updated DateTime  @default(now())
 
   Product      Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+}
+
+// Granular inventory tracking per variation
+model VariationInventory {
+  id                String    @id @default(uuid())
+  variation_id      String    @unique // One inventory per variation
+  quantity          Int
+  low_stock_threshold Int     @default(5)
+  reserved_quantity Int       @default(0) // For items in checkout process
+  last_updated      DateTime  @default(now())
+  
+  Variation         ProductVariation @relation(fields: [variation_id], references: [id], onDelete: Cascade)
+
+  Product Product[]
 }
 
 model Order {
@@ -260,6 +309,10 @@ model Order {
   total_amount  Float
   status        OrderStatus @default(PENDING)
   created_at    DateTime    @default(now())
+  
+  // Archiving fields
+  archived      Boolean     @default(false)
+  archived_at   DateTime?
 
   Users         Users       @relation(fields: [user_id], references: [id])
   Address       Address     @relation(fields: [address_id], references: [id])
@@ -273,8 +326,30 @@ model OrderItem {
   product_id         String
   quantity           Int
   price              Float    
+  
+  variation_id       String?
+  size               String?
+  color              String?
+  
   Order              Order    @relation(fields: [order_id], references: [id])
   Product            Product  @relation(fields: [product_id], references: [id])
+}
+
+// New archive tables for long-term storage
+
+model ArchivedProduct {
+  id              String    @id @default(uuid())
+  original_id     String    @unique // The ID from the original Product table
+  data            Json      // All product data stored as JSON
+  archived_at     DateTime  @default(now())
+}
+
+model ArchivedOrder {
+  id              String    @id @default(uuid())
+  original_id     String    @unique // The ID from the original Order table
+  user_id         String    // Keeping direct reference to user
+  data            Json      // All order data including items as JSON
+  archived_at     DateTime  @default(now())
 }
 
 model CartItem {
@@ -310,8 +385,6 @@ model ProductReview {
   
   @@unique([product_id, user_id]) // One review per user per product
 }
-
-
 
 model Payment {
   id             String          @id @default(uuid())

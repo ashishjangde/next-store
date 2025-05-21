@@ -1,61 +1,146 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { CategoryResponseDto } from 'src/modules/category/dto/category-response-dto';
+import { InventoryResponseDto } from 'src/modules/inventory/dto/inventory-response.dto';
+import { ProductVariationResponseDto } from './product-variation-response.dto';
 
-export class ProductResponseDto {
-  @ApiProperty({ description: 'Product ID', example: '550e8400-e29b-41d4-a716-446655440000' })
+export class VendorDto {
+  @ApiProperty({ description: 'The unique identifier of the vendor' })
   id: string;
 
-  @ApiProperty({ description: 'Product title', example: 'Slim Fit Cotton T-Shirt' })
-  title: string;
+  @ApiProperty({ description: 'The name of the shop' })
+  shop_name: string;
 
-  @ApiProperty({ description: 'Product description', example: 'A comfortable slim fit t-shirt made of 100% cotton.' })
-  description: string;
-
-  @ApiProperty({ description: 'Product price', example: 29.99 })
-  price: number;
-
-  @ApiProperty({ description: 'Vendor ID', example: '550e8400-e29b-41d4-a716-446655440001' })
-  vendor_id: string;
-
-  @ApiProperty({ description: 'Product images URLs', example: ['http://example.com/image1.jpg', 'http://example.com/image2.jpg'] })
-  images: string[];
-
-  @ApiPropertyOptional({ description: 'Product brand', example: 'Nike' })
-  brand?: string;
-
-  @ApiPropertyOptional({ description: 'Target gender', example: 'Men\'s' })
-  gender?: string;
-
-  @ApiPropertyOptional({ description: 'Product season', example: 'Summer' })
-  season?: string;
-
-  @ApiPropertyOptional({ description: 'Product weight in grams', example: 150 })
-  weight?: number;
-
-  @ApiPropertyOptional({ description: 'Primary color name', example: 'Navy Blue' })
-  color_name?: string;
-
-  @ApiPropertyOptional({ description: 'Color family for filtering', example: 'Blue' })
-  color_family?: string;
-
-  @ApiPropertyOptional({ description: 'Category information' })
-  category?: {
+  @ApiPropertyOptional({ description: 'User details of the vendor' })
+  User?: {
     id: string;
     name: string;
-    slug: string;
+    profile_picture?: string;
   };
+}
 
-  @ApiPropertyOptional({ description: 'Inventory information' })
-  inventory?: {
-    quantity: number;
-    last_updated: Date;
+export class ProductAttributeValueDto {
+  @ApiProperty({ description: 'The attribute value ID' })
+  attribute_value_id: string;
+
+  @ApiProperty({ description: 'The attribute value details' })
+  attributeValue: {
+    id: string;
+    value: string;
+    display_value?: string;
+    attribute: {
+      id: string;
+      name: string;
+      type: string;
+    }
   };
+}
 
-  @ApiPropertyOptional({ description: 'Vendor information' })
-  vendor?: {
-    shop_name: string;
-    status: string;
-  };
+export class ProductResponseDto {
+  @ApiProperty({ description: 'The unique identifier of the product' })
+  id: string;
 
-  @ApiPropertyOptional({ description: 'Apparel details' })
-  apparel_details?: Record<string, any>;
+  @ApiProperty({ description: 'The title of the product' })
+  title: string;
+
+  @ApiProperty({ description: 'The description of the product' })
+  description: string;
+
+  @ApiPropertyOptional({ description: 'The Stock Keeping Unit code' })
+  sku?: string;
+
+  @ApiProperty({ description: 'The price of the product' })
+  price: number;
+
+  @ApiProperty({ description: 'The ID of the vendor who sells this product' })
+  vendor_id: string;
+
+  @ApiProperty({ description: 'The URLs of the product images' })
+  images: string[];
+
+  @ApiPropertyOptional({ description: 'The brand of the product' })
+  brand?: string;
+
+  @ApiPropertyOptional({ description: 'The intended gender for the product' })
+  gender?: string;
+
+  @ApiPropertyOptional({ description: 'The season the product is suitable for' })
+  season?: string;
+
+  @ApiPropertyOptional({ description: 'The weight of the product in grams' })
+  weight?: number;
+
+  @ApiPropertyOptional({ description: 'The primary color name' })
+  color_name?: string;
+
+  @ApiPropertyOptional({ description: 'The color family for filtering' })
+  color_family?: string;
+
+  @ApiProperty({ description: 'Whether the product is active' })
+  is_active: boolean;
+
+  @ApiProperty({ description: 'Whether the product is archived' })
+  archived: boolean;
+
+  @ApiPropertyOptional({ description: 'The date when the product was archived' })
+  archived_at?: Date;
+
+  @ApiPropertyOptional({ description: 'The ID of the category this product belongs to' })
+  category_id?: string;
+
+  @ApiPropertyOptional({ 
+    description: 'The category this product belongs to',
+    type: () => CategoryResponseDto
+  })
+  @Type(() => CategoryResponseDto)
+  category?: CategoryResponseDto;
+
+  @ApiPropertyOptional({ 
+    description: 'The vendor who sells this product',
+    type: () => VendorDto
+  })
+  @Type(() => VendorDto)
+  Vendor?: VendorDto;
+
+  @ApiPropertyOptional({ 
+    description: 'The variations of this product',
+    type: () => [ProductVariationResponseDto]
+  })
+  @Type(() => ProductVariationResponseDto)
+  Variations?: ProductVariationResponseDto[];
+
+  @ApiPropertyOptional({ 
+    description: 'The inventory of this product',
+    type: () => InventoryResponseDto
+  })
+  @Type(() => InventoryResponseDto)
+  Inventory?: InventoryResponseDto;
+
+  @ApiPropertyOptional({ 
+    description: 'The attribute values assigned to this product',
+    type: () => [ProductAttributeValueDto]
+  })
+  @Type(() => ProductAttributeValueDto)
+  attributeValues?: ProductAttributeValueDto[];
+
+  @ApiProperty({ description: 'The creation timestamp' })
+  created_at?: Date;
+
+  @ApiProperty({ description: 'The last update timestamp' })
+  updated_at?: Date;
+}
+
+export class ProductListResponseDto {
+  @ApiProperty({ description: 'Array of products', type: [ProductResponseDto] })
+  @Type(() => ProductResponseDto)
+  data: ProductResponseDto[];
+
+  @ApiProperty({ description: 'Total number of products' })
+  total: number;
+
+  @ApiProperty({ description: 'Current page number' })
+  page: number;
+
+  @ApiProperty({ description: 'Number of items per page' })
+  limit: number;
 }

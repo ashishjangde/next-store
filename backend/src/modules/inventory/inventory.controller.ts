@@ -1,190 +1,121 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiExtraModels } from '@nestjs/swagger';
+import { Controller, Get, Put, Body, Param, Query, UseGuards, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse as SwaggerResponse, ApiQuery } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
-import { CreateInventoryDto } from './dto/create-inventory.dto';
-import { UpdateInventoryDto } from './dto/update-inventory.dto';
-import { InventoryResponseDto } from './dto/inventory-response.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Role } from 'src/common/decorators/roles-decorator';
 import { Roles } from '@prisma/client';
+import { InventoryUpdateDto, VariationInventoryUpdateDto } from './dto/inventory-update.dto';
+import { InventoryResponseDto, VariationInventoryResponseDto, LowStockProductDto, LowStockVariationDto } from './dto/inventory-response.dto';
+import { GetUser } from 'src/common/decorators/user.decorator';
 import { ApiCustomResponse } from 'src/common/responses/ApiResponse';
 import { ApiCustomErrorResponse } from 'src/common/responses/ApiError';
-import CustomApiResponse from 'src/common/responses/ApiResponse';
+import ApiResponse from 'src/common/responses/ApiResponse';
 
-@ApiTags('Inventory')
 @Controller('inventory')
-@ApiExtraModels(InventoryResponseDto)
+@ApiTags('Inventory')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  @Post()
-  @Role(Roles.ADMIN, Roles.VENDOR)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({
-    summary: 'Create inventory for a product',
-    description: 'Admin and vendor only endpoint to create inventory for a product'
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'Inventory created successfully',
-    schema: ApiCustomResponse(InventoryResponseDto)
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: 'Inventory for this product already exists',
-    schema: ApiCustomErrorResponse(HttpStatus.CONFLICT, 'Inventory for this product already exists')
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid input data',
-    schema: ApiCustomErrorResponse(HttpStatus.BAD_REQUEST, 'Invalid input data')
-  })
-  @ApiResponse({
-    status: HttpStatus.UNAUTHORIZED,
-    description: 'Unauthorized',
-    schema: ApiCustomErrorResponse(HttpStatus.UNAUTHORIZED, 'Unauthorized')
-  })
-  @ApiResponse({
-    status: HttpStatus.FORBIDDEN,
-    description: 'Forbidden - Admin or vendor access required',
-    schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Forbidden - Admin or vendor access required')
-  })
-  async create(@Body() createInventoryDto: CreateInventoryDto) {
-    const inventory = await this.inventoryService.createInventory(createInventoryDto);
-    return new CustomApiResponse(inventory);
-  }
-
-  @Get()
-  @Role(Roles.ADMIN, Roles.VENDOR)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Get all inventory',
-    description: 'Admin and vendor only endpoint to get all inventory'
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Inventory retrieved successfully',
-    schema: ApiCustomResponse([InventoryResponseDto])
-  })
-  async findAll() {
-    const inventory = await this.inventoryService.findAll();
-    return new CustomApiResponse(inventory);
-  }
-
-  @Get('low-stock')
-  @Role(Roles.ADMIN, Roles.VENDOR)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Get low stock inventory',
-    description: 'Admin and vendor only endpoint to get inventory items with low stock'
-  })
-  @ApiQuery({
-    name: 'threshold',
-    required: false,
-    type: Number,
-    description: 'Low stock threshold (default: 10)'
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Low stock inventory retrieved successfully',
-    schema: ApiCustomResponse([InventoryResponseDto])
-  })
-  async findLowStock(@Query('threshold') threshold: number) {
-    const thresholdValue = threshold ? Number(threshold) : 10;
-    const inventory = await this.inventoryService.findLowStock(thresholdValue);
-    return new CustomApiResponse(inventory);
-  }
-
   @Get('product/:productId')
   @Role(Roles.ADMIN, Roles.VENDOR)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Get inventory by product ID',
-    description: 'Admin and vendor only endpoint to get inventory for a specific product'
-  })
-  @ApiParam({
-    name: 'productId',
-    description: 'Product ID',
-    type: String
-  })
-  @ApiResponse({
+  @ApiOperation({ summary: 'Get product inventory', description: 'Get inventory details for a specific product' })
+  @SwaggerResponse({
     status: HttpStatus.OK,
-    description: 'Inventory retrieved successfully',
+    description: 'Inventory found',
     schema: ApiCustomResponse(InventoryResponseDto)
   })
-  @ApiResponse({
+  @SwaggerResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Inventory not found for this product',
-    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Inventory not found for this product')
+    description: 'Product or inventory not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Product or inventory not found')
   })
-  async findByProductId(@Param('productId') productId: string) {
-    const inventory = await this.inventoryService.findByProductId(productId);
-    return new CustomApiResponse(inventory);
+  async getProductInventory(
+    @Param('productId') productId: string
+  ): Promise<ApiResponse<InventoryResponseDto>> {
+    const inventory = await this.inventoryService.getProductInventory(productId);
+    return new ApiResponse<InventoryResponseDto>(inventory);
   }
 
   @Put('product/:productId')
   @Role(Roles.ADMIN, Roles.VENDOR)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Update inventory by product ID',
-    description: 'Admin and vendor only endpoint to update inventory for a specific product'
-  })
-  @ApiParam({
-    name: 'productId',
-    description: 'Product ID',
-    type: String
-  })
-  @ApiResponse({
+  @ApiOperation({ summary: 'Update product inventory', description: 'Update inventory details for a specific product' })
+  @SwaggerResponse({
     status: HttpStatus.OK,
-    description: 'Inventory updated successfully',
+    description: 'Inventory updated',
     schema: ApiCustomResponse(InventoryResponseDto)
   })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Inventory not found for this product',
-    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Inventory not found for this product')
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid input data',
-    schema: ApiCustomErrorResponse(HttpStatus.BAD_REQUEST, 'Invalid input data')
-  })
-  async update(
+  async updateProductInventory(
     @Param('productId') productId: string,
-    @Body() updateInventoryDto: UpdateInventoryDto
-  ) {
-    const inventory = await this.inventoryService.update(productId, updateInventoryDto);
-    return new CustomApiResponse(inventory);
+    @Body() updateDto: InventoryUpdateDto,
+    @GetUser('id') vendorId: string
+  ): Promise<ApiResponse<InventoryResponseDto>> {
+    const inventory = await this.inventoryService.updateProductInventory(productId, updateDto, vendorId);
+    return new ApiResponse<InventoryResponseDto>(inventory);
   }
 
-  @Delete('product/:productId')
-  @Role(Roles.ADMIN)
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Delete inventory by product ID',
-    description: 'Admin only endpoint to delete inventory for a specific product'
-  })
-  @ApiParam({
-    name: 'productId',
-    description: 'Product ID',
-    type: String
-  })
-  @ApiResponse({
+  @Get('variation/:variationId')
+  @Role(Roles.ADMIN, Roles.VENDOR)
+  @ApiOperation({ summary: 'Get variation inventory', description: 'Get inventory details for a specific product variation' })
+  @SwaggerResponse({
     status: HttpStatus.OK,
-    description: 'Inventory deleted successfully',
-    schema: ApiCustomResponse({ message: 'Inventory deleted successfully' })
+    description: 'Inventory found',
+    schema: ApiCustomResponse(VariationInventoryResponseDto)
   })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'Inventory not found for this product',
-    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Inventory not found for this product')
+  async getVariationInventory(
+    @Param('variationId') variationId: string
+  ): Promise<ApiResponse<VariationInventoryResponseDto>> {
+    const inventory = await this.inventoryService.getVariationInventory(variationId);
+    return new ApiResponse<VariationInventoryResponseDto>(inventory);
+  }
+
+  @Put('variation/:variationId')
+  @Role(Roles.ADMIN, Roles.VENDOR)
+  @ApiOperation({ summary: 'Update variation inventory', description: 'Update inventory details for a specific product variation' })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Inventory updated',
+    schema: ApiCustomResponse(VariationInventoryResponseDto)
   })
-  async remove(@Param('productId') productId: string) {
-    await this.inventoryService.remove(productId);
-    return new CustomApiResponse({ message: 'Inventory deleted successfully' });
+  async updateVariationInventory(
+    @Param('variationId') variationId: string,
+    @Body() updateDto: VariationInventoryUpdateDto,
+    @GetUser('id') vendorId: string
+  ): Promise<ApiResponse<VariationInventoryResponseDto>> {
+    const inventory = await this.inventoryService.updateVariationInventory(variationId, updateDto, vendorId);
+    return new ApiResponse<VariationInventoryResponseDto>(inventory);
+  }
+
+  @Get('low-stock/products')
+  @Role(Roles.ADMIN, Roles.VENDOR)
+  @ApiOperation({ summary: 'Get low stock products', description: 'Get products that are low on stock' })
+  @ApiQuery({ name: 'threshold', type: Number, required: false, description: 'Custom low stock threshold' })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Low stock products retrieved',
+    schema: ApiCustomResponse([LowStockProductDto])
+  })
+  async getLowStockProducts(
+    @Query('threshold') threshold?: number
+  ): Promise<ApiResponse<LowStockProductDto[]>> {
+    const products = await this.inventoryService.getLowStockProducts(threshold ? +threshold : undefined);
+    return new ApiResponse<LowStockProductDto[]>(products);
+  }
+
+  @Get('low-stock/variations')
+  @Role(Roles.ADMIN, Roles.VENDOR)
+  @ApiOperation({ summary: 'Get low stock variations', description: 'Get product variations that are low on stock' })
+  @ApiQuery({ name: 'threshold', type: Number, required: false, description: 'Custom low stock threshold' })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Low stock variations retrieved',
+    schema: ApiCustomResponse([LowStockVariationDto])
+  })
+  async getLowStockVariations(
+    @Query('threshold') threshold?: number
+  ): Promise<ApiResponse<LowStockVariationDto[]>> {
+    const variations = await this.inventoryService.getLowStockVariations(threshold ? +threshold : undefined);
+    return new ApiResponse<LowStockVariationDto[]>(variations);
   }
 }

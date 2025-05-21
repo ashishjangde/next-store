@@ -17,5 +17,11 @@ export const uploadConfig = {
     allowedTypes: /\.(jpg|jpeg|png|gif)$/,
     errorMessage: 'Only image files (jpg, jpeg, png, gif) are allowed!'
   },
+  productImages: {
+    destination: './uploads/products',
+    maxSize: 8 * 1024 * 1024, // 8MB
+    allowedTypes: /\.(jpg|jpeg|png|gif|webp)$/,
+    errorMessage: 'Only image files (jpg, jpeg, png, gif, webp) are allowed!'
+  },
   // Add more upload configurations as needed
 };

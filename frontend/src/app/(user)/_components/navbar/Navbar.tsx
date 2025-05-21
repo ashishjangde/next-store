@@ -38,8 +38,8 @@ import { useAuthStore } from '@/store/auth-store'
 import { memo, useEffect, useState, useMemo } from 'react'
 import AuthWrapper from '@/components/auth/AuthWrapper'
 import { AuthActions } from '@/api-actions/auth-actions'
-import { useToast } from '@/hooks/use-toast'
-import { useTheme } from 'next-themes'
+import { useToast } from '@/hooks/use-toast';
+import { useTheme } from 'next-themes';
 
 const ProfileDropdown = memo(() => {
   const user = useAuthStore(state => state.user)
@@ -129,7 +129,6 @@ const ProfileDropdown = memo(() => {
         </DropdownMenuSub>
         
         <DropdownMenuSeparator />
-        
         <DropdownMenuItem 
           onClick={handleLogout} 
           className="flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer"
