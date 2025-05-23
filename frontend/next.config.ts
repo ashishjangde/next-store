@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { tree } from "next/dist/build/templates/app-page";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -9,11 +8,16 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
         pathname: '/a/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'in-maa-1.linodeobjects.com',
+        pathname: '/nextstorebucket/**',
       }
     ],
   },
-  eslint :{
-    ignoreDuringBuilds : true
+  eslint: {
+    ignoreDuringBuilds: true
   }
 };
 

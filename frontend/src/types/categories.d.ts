@@ -1,40 +1,39 @@
-interface ICategory {
+// Define the Attribute interface if it's not already defined elsewhere
+interface Attribute {
   id: string;
   name: string;
-  description: string;
+  display_name: string;
+  type: string;
+  required?: boolean;
+  filterable?: boolean;
+  created_at:  Date;
+  updated_at: Date;
+}
+
+interface CategoryAttribute {
+  category_id: string;
+  attribute_id: string;
+  required: boolean;
+  attribute?: Attribute; // References the Attribute type from attribute.d.ts
+}
+
+interface Category {
+  id: string;
+  name: string;
+  description?: string | null;
   slug: string;
-  image: string;
+  image?: string | null;
   is_featured: boolean;
   active: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
+  level : 0|1|2
+  created_at:  Date;
+  updated_at:  Date;
+  parent_id?: string | null;
+  parent?: Category | null;
+  children?: Category[];
+  products?: string[];
+  attributes?: CategoryAttribute[];
 }
 
-interface ICreateCategory {
-  name: string;
-  description: string;
-  slug: string;
-  image?: File | null;
-  is_featured?: boolean;
-  active?: boolean;
-  sort_order?: number;
-}
 
-interface IUpdateCategory {
-  name?: string;
-  description?: string;
-  slug?: string;
-  image?: File | null;
-  is_featured?: boolean;
-  active?: boolean;
-  sort_order?: number;
-}
 
-interface ICategoriesResponse {
-  categories: ICategory[];
-  total?: number;
-  page?: number;
-  limit?: number;
-  totalPages?: number;
-}

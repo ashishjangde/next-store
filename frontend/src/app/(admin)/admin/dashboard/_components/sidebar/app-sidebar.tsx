@@ -68,14 +68,21 @@ const data = {
         {
           title: "All Categories",
           url: "/admin/dashboard/categories",
+        }
+      ],
+    },
+    {
+      title: "Attributes",
+      url: "/admin/dashboard/attributes",
+      icon: ClipboardList,
+      items: [
+        {
+          title: "All Attributes",
+          url: "/admin/dashboard/attributes",
         },
         {
-          title: "Add Category",
-          url: "/admin/dashboard/categories/new",
-        },
-        {
-          title: "Manage Attributes",
-          url: "/admin/dashboard/categories/attributes",
+          title: "Add Attribute",
+          url: "/admin/dashboard/attributes/new",
         },
       ],
     },

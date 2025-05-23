@@ -1,7 +1,11 @@
-import React from 'react'
+import { Metadata } from "next";
+import { CategoriesClient } from "@/components/admin/categories/categories-client";
 
-export default function page() {
-  return (
-    <div>page</div>
-  )
+export const metadata: Metadata = {
+  title: "Categories Management | Admin Dashboard",
+  description: "Manage store categories, including creation, updating, and attribute assignment",
+};
+
+export default async function CategoriesPage() {
+  return <CategoriesClient />;
 }

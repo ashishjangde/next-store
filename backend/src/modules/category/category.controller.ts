@@ -29,7 +29,7 @@ export class CategoryController {
   @Role(Roles.ADMIN)
   @ApiOperation({
     summary: "Create a new category (Admin only)",
-    description: "Create a new category with optional image upload"
+    description: "Create a new category with optional image upload. Level restrictions apply: 0 (root), 1 (subcategory), 2 (leaf)"
   })
   @ApiConsumes('multipart/form-data')
   @SwaggerResponse({
@@ -52,173 +52,87 @@ export class CategoryController {
     @Body() categoryCreateDto: CategoryCreateDto,
     @UploadedFile() file?: Express.Multer.File
   ): Promise<ApiResponse<CategoryResponseDto>> {
-    const category = await this.categoryService.create(categoryCreateDto, file);
-    return new ApiResponse<CategoryResponseDto>(
-      plainToClass(CategoryResponseDto, category, { 
-        excludeExtraneousValues: false,
-        enableImplicitConversion: true 
-      })
-    );
+    console.log('Category Controller - Create method called');
+    console.log('Request body (raw):', categoryCreateDto);
+    
+    // Log the specific values that might cause validation issues
+    console.log('is_featured type:', typeof categoryCreateDto.is_featured, 'value:', categoryCreateDto.is_featured);
+    console.log('active type:', typeof categoryCreateDto.active, 'value:', categoryCreateDto.active);
+    console.log('parent_id type:', typeof categoryCreateDto.parent_id, 'value:', categoryCreateDto.parent_id);
+    
+    console.log('File received:', file ? `Yes, filename: ${file.originalname}` : 'No file');
+    
+    try {
+      const category = await this.categoryService.create(categoryCreateDto, file);
+      console.log('Category created successfully:', category?.id);
+      return new ApiResponse<CategoryResponseDto>(
+        plainToClass(CategoryResponseDto, category, { 
+          excludeExtraneousValues: false,
+          enableImplicitConversion: true 
+        })
+      );
+    } catch (error) {
+      console.error('Error in category controller create method:', error);
+      throw error;
+    }
   }
 
   @Public()
-  @Get()
+  @Get('root')
   @ApiOperation({
-    summary: "Get all active categories",
-    description: "Retrieve all active categories with pagination (Public access)"
+    summary: "Get root level active categories",
+    description: "Retrieve only active root level categories (level 0)"
   })
-  @ApiQuery({ name: 'page', type: Number, required: false, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', type: Number, required: false, description: 'Items per page (default: 10)' })
-  @ApiQuery({ name: 'parentId', type: String, required: false, description: 'Filter by parent category ID' })
   @ApiQuery({ name: 'includeProducts', type: Boolean, required: false, description: 'Include products in response' })
   @ApiQuery({ name: 'includeAttributes', type: Boolean, required: false, description: 'Include attributes in response' })
   @SwaggerResponse({
     status: HttpStatus.OK,
-    description: 'Categories found',
-    schema: ApiCustomResponse({ data: [CategoryResponseDto], total: 0, page: 1, limit: 10 })
-  })
-  async getAllActiveCategories(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('parentId') parentId?: string,
-    @Query('includeProducts') includeProducts?: string,
-    @Query('includeAttributes') includeAttributes?: string
-  ): Promise<ApiResponse<{ data: CategoryResponseDto[], total: number, page: number, limit: number }>> {
-    const result = await this.categoryService.getAllCategories(
-      page ? +page : 1,
-      limit ? +limit : 10,
-      parentId,
-      false, // includeInactive = false for public route
-      includeProducts === 'true',
-      includeAttributes === 'true'
-    );
-    
-    return new ApiResponse(result);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Role(Roles.ADMIN)
-  @Get('admin')
-  @ApiOperation({
-    summary: "Get all categories including inactive (Admin only)",
-    description: "Retrieve all categories with option to include inactive ones (Admin access only)"
-  })
-  @ApiQuery({ name: 'page', type: Number, required: false, description: 'Page number (default: 1)' })
-  @ApiQuery({ name: 'limit', type: Number, required: false, description: 'Items per page (default: 10)' })
-  @ApiQuery({ name: 'parentId', type: String, required: false, description: 'Filter by parent category ID' })
-  @ApiQuery({ name: 'includeInactive', type: Boolean, required: false, description: 'Include inactive categories' })
-  @ApiQuery({ name: 'includeProducts', type: Boolean, required: false, description: 'Include products in response' })
-  @ApiQuery({ name: 'includeAttributes', type: Boolean, required: false, description: 'Include attributes in response' })
-  @SwaggerResponse({
-    status: HttpStatus.OK,
-    description: 'Categories found',
-    schema: ApiCustomResponse({ data: [CategoryResponseDto], total: 0, page: 1, limit: 10 })
-  })
-  async getAllCategoriesAdmin(
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('parentId') parentId?: string,
-    @Query('includeInactive') includeInactive?: string,
-    @Query('includeProducts') includeProducts?: string,
-    @Query('includeAttributes') includeAttributes?: string
-  ): Promise<ApiResponse<{ data: CategoryResponseDto[], total: number, page: number, limit: number }>> {
-    const result = await this.categoryService.getAllCategories(
-      page ? +page : 1,
-      limit ? +limit : 10,
-      parentId,
-      includeInactive === 'true',
-      includeProducts === 'true',
-      includeAttributes === 'true'
-    );
-    
-    return new ApiResponse(result);
-  }
-
-  @Public()
-  @Get('tree')
-  @ApiOperation({
-    summary: "Get category tree structure",
-    description: "Retrieve all categories in a hierarchical tree structure (root > stem > leaf)"
-  })
-  @SwaggerResponse({
-    status: HttpStatus.OK,
-    description: 'Category tree retrieved',
+    description: 'Root level categories retrieved',
     schema: ApiCustomResponse([CategoryResponseDto])
   })
-  async getCategoryTree(): Promise<ApiResponse<CategoryResponseDto[]>> {
-    const categoryTree = await this.categoryService.getCategoryTree();
-    return new ApiResponse<CategoryResponseDto[]>(categoryTree);
-  }
-
-  @Public()
-  @Get('top-level')
-  @ApiOperation({
-    summary: "Get top level active categories",
-    description: "Retrieve only active root level categories (those without a parent)"
-  })
-  @ApiQuery({ name: 'includeProducts', type: Boolean, required: false, description: 'Include products in response' })
-  @ApiQuery({ name: 'includeAttributes', type: Boolean, required: false, description: 'Include attributes in response' })
-  @SwaggerResponse({
-    status: HttpStatus.OK,
-    description: 'Top level categories retrieved',
-    schema: ApiCustomResponse({ data: [CategoryResponseDto], total: 0 })
-  })
-  async getTopLevelCategories(
+  async getRootCategories(
     @Query('includeProducts') includeProducts?: string,
     @Query('includeAttributes') includeAttributes?: string
-  ): Promise<ApiResponse<{ data: CategoryResponseDto[], total: number }>> {
-    const result = await this.categoryService.getTopLevelCategories(
+  ): Promise<ApiResponse<CategoryResponseDto[]>> {
+    const rootCategories = await this.categoryService.getRootCategories(
       false, // Only active categories
       includeProducts === 'true',
       includeAttributes === 'true'
     );
-    return new ApiResponse(result);
+    return new ApiResponse<CategoryResponseDto[]>(rootCategories);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Role(Roles.ADMIN)
-  @Get('admin/top-level')
+  @Get('admin/root')
   @ApiOperation({
-    summary: "Get all top level categories (Admin only)",
-    description: "Retrieve all root level categories with option to include inactive ones (Admin access only)"
-  })
-  @ApiQuery({
-    name: 'includeInactive',
-    type: Boolean,
-    required: false,
-    description: 'Whether to include inactive categories'
+    summary: "Get all root level categories (Admin only)",
+    description: "Retrieve all root level categories including inactive ones (Admin access only)"
   })
   @ApiQuery({ name: 'includeProducts', type: Boolean, required: false, description: 'Include products in response' })
   @ApiQuery({ name: 'includeAttributes', type: Boolean, required: false, description: 'Include attributes in response' })
   @SwaggerResponse({
     status: HttpStatus.OK,
-    description: 'Top level categories retrieved',
-    schema: ApiCustomResponse({ data: [CategoryResponseDto], total: 0 })
+    description: 'Root level categories retrieved',
+    schema: ApiCustomResponse([CategoryResponseDto])
   })
-  async getTopLevelCategoriesAdmin(
-    @Query('includeInactive') includeInactive?: string,
+  async getAllRootCategoriesAdmin(
     @Query('includeProducts') includeProducts?: string,
     @Query('includeAttributes') includeAttributes?: string
-  ): Promise<ApiResponse<{ data: CategoryResponseDto[], total: number }>> {
-    const result = await this.categoryService.getTopLevelCategories(
-      includeInactive === 'true',
+  ): Promise<ApiResponse<CategoryResponseDto[]>> {
+    const rootCategories = await this.categoryService.getRootCategories(
+      true, // Include inactive categories
       includeProducts === 'true',
       includeAttributes === 'true'
     );
-    return new ApiResponse(result);
+    return new ApiResponse<CategoryResponseDto[]>(rootCategories);
   }
 
   @Public()
   @Get('slug/:slug')
   @ApiOperation({
     summary: "Get category by slug",
-    description: "Retrieve a category by its slug with optional child categories and products"
-  })
-  @ApiQuery({
-    name: 'includeChildren',
-    type: Boolean,
-    required: false,
-    description: 'Whether to include child categories'
+    description: "Retrieve a category by its slug with active children. Only non-level 2 categories have children."
   })
   @ApiQuery({
     name: 'includeProducts',
@@ -244,13 +158,98 @@ export class CategoryController {
   })
   async getCategoryBySlug(
     @Param('slug') slug: string,
-    @Query('includeChildren') includeChildren?: string,
     @Query('includeProducts') includeProducts?: string,
     @Query('includeAttributes') includeAttributes?: string
   ): Promise<ApiResponse<CategoryResponseDto>> {
     const category = await this.categoryService.getCategoryBySlug(
-      slug, 
-      includeChildren === 'true',
+      slug,
+      includeProducts === 'true',
+      includeAttributes === 'true'
+    );
+    
+    return new ApiResponse<CategoryResponseDto>(category);
+  }
+  
+  @Public()
+  @Get(':id')
+  @ApiOperation({
+    summary: "Get category by ID",
+    description: "Retrieve active category by its ID with children"
+  })
+  @ApiQuery({
+    name: 'includeProducts',
+    type: Boolean,
+    required: false,
+    description: 'Whether to include products in the category'
+  })
+  @ApiQuery({
+    name: 'includeAttributes',
+    type: Boolean,
+    required: false,
+    description: 'Whether to include attributes in the category'
+  })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Category found',
+    schema: ApiCustomResponse(CategoryResponseDto)
+  })
+  @SwaggerResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Category not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Category not found')
+  })
+  async getCategoryById(
+    @Param('id') id: string,
+    @Query('includeProducts') includeProducts?: string,
+    @Query('includeAttributes') includeAttributes?: string
+  ): Promise<ApiResponse<CategoryResponseDto>> {
+    const category = await this.categoryService.getCategoryById(
+      id,
+      false, // Only active categories
+      includeProducts === 'true',
+      includeAttributes === 'true'
+    );
+    
+    return new ApiResponse<CategoryResponseDto>(category);
+  }
+  
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(Roles.ADMIN)
+  @Get('admin/:id')
+  @ApiOperation({
+    summary: "Get category by ID (Admin only)",
+    description: "Retrieve any category (active/inactive) by ID with all children"
+  })
+  @ApiQuery({
+    name: 'includeProducts',
+    type: Boolean,
+    required: false,
+    description: 'Whether to include products in the category'
+  })
+  @ApiQuery({
+    name: 'includeAttributes',
+    type: Boolean,
+    required: false,
+    description: 'Whether to include attributes in the category'
+  })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Category found',
+    schema: ApiCustomResponse(CategoryResponseDto)
+  })
+  @SwaggerResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Category not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Category not found')
+  })
+  async getCategoryByIdAdmin(
+    @Param('id') id: string,
+    @Query('includeProducts') includeProducts?: string,
+    @Query('includeAttributes') includeAttributes?: string
+  ): Promise<ApiResponse<CategoryResponseDto>> {
+    const category = await this.categoryService.getCategoryById(
+      id,
+      true, // Include inactive categories
       includeProducts === 'true',
       includeAttributes === 'true'
     );
@@ -263,7 +262,7 @@ export class CategoryController {
   @Put(':id')
   @ApiOperation({
     summary: "Update category (Admin only)",
-    description: "Update an existing category with optional image upload"
+    description: "Update an existing category with optional image upload. Level restrictions apply."
   })
   @ApiConsumes('multipart/form-data')
   @SwaggerResponse({
@@ -287,8 +286,19 @@ export class CategoryController {
     @Body() updateDto: CategoryUpdateDto,
     @UploadedFile() file?: Express.Multer.File
   ): Promise<ApiResponse<CategoryResponseDto>> {
-    const category = await this.categoryService.updateCategory(id, updateDto, file);
-    return new ApiResponse<CategoryResponseDto>(category);
+    console.log('Category Controller - Update method called');
+    console.log('Category ID:', id);
+    console.log('Request body:', JSON.stringify(updateDto, null, 2));
+    console.log('File received:', file ? `Yes, filename: ${file.originalname}` : 'No file');
+    
+    try {
+      const category = await this.categoryService.updateCategory(id, updateDto, file);
+      console.log('Category updated successfully:', id);
+      return new ApiResponse<CategoryResponseDto>(category);
+    } catch (error) {
+      console.error('Error in category controller update method:', error);
+      throw error;
+    }
   }
   
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -296,7 +306,7 @@ export class CategoryController {
   @Post(':categoryId/attributes')
   @ApiOperation({
     summary: "Add attribute to category (Admin only)",
-    description: "Assign an attribute to a category with optional required flag"
+    description: "Assign an attribute to a level 2 category with optional required flag"
   })
   @SwaggerResponse({
     status: HttpStatus.OK,
@@ -307,6 +317,11 @@ export class CategoryController {
     status: HttpStatus.NOT_FOUND,
     description: 'Category not found',
     schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Category not found')
+  })
+  @SwaggerResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Attributes can only be added to level 2 categories',
+    schema: ApiCustomErrorResponse(HttpStatus.BAD_REQUEST, 'Attributes can only be added to level 2 categories')
   })
   async addAttributeToCategory(
     @Param('categoryId') categoryId: string,
@@ -326,7 +341,7 @@ export class CategoryController {
   @Delete(':categoryId/attributes/:attributeId')
   @ApiOperation({
     summary: "Remove attribute from category (Admin only)",
-    description: "Remove an attribute from a category"
+    description: "Remove an attribute from a level 2 category"
   })
   @SwaggerResponse({
     status: HttpStatus.OK,
@@ -335,8 +350,8 @@ export class CategoryController {
   })
   @SwaggerResponse({
     status: HttpStatus.NOT_FOUND,
-    description: 'Category not found',
-    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Category not found')
+    description: 'Category or attribute not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Category or attribute not found')
   })
   async removeAttributeFromCategory(
     @Param('categoryId') categoryId: string,
@@ -348,5 +363,34 @@ export class CategoryController {
     );
     
     return new ApiResponse<CategoryResponseDto>(category);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(Roles.ADMIN)
+  @Delete(':id')
+  @ApiOperation({
+    summary: "Delete category (Admin only)",
+    description: "Delete a category and all its associations"
+  })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Category successfully deleted',
+    schema: ApiCustomResponse({ message: "Category deleted successfully" })
+  })
+  @SwaggerResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Category not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Category not found')
+  })
+  @SwaggerResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Cannot delete category with child categories',
+    schema: ApiCustomErrorResponse(HttpStatus.BAD_REQUEST, 'Cannot delete category with child categories')
+  })
+  async deleteCategory(
+    @Param('id') id: string
+  ): Promise<ApiResponse<{ message: string }>> {
+    await this.categoryService.deleteCategory(id);
+    return new ApiResponse<{ message: string }>({ message: "Category deleted successfully" });
   }
 }

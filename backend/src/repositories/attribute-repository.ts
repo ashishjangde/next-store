@@ -43,18 +43,20 @@ export class AttributeRepository {
   async findAttributeById(id: string, includeValues: boolean = false): Promise<any | null> {
     const cacheKey = `attribute:id:${id}`;
     try {
-      const cached = await this.redis.get<Attribute>(cacheKey);
+      // Only use cache when not including values
+      const cached = includeValues ? null : await this.redis.get<Attribute>(cacheKey);
       
       if (cached && !includeValues) {
         return cached;
       }
 
+      // Fix the query to get values properly
       const attribute = await handleDatabaseOperations(() =>
         this.prisma.attribute.findUnique({
           where: { id },
           include: includeValues ? {
             values: true,
-            categories: { // Changed from categoryAttributes to categories (matching Prisma schema relation)
+            categories: { 
               include: {
                 category: true
               }
@@ -62,6 +64,16 @@ export class AttributeRepository {
           } : undefined
         })
       );
+
+      // Fix values array if it's empty or malformed
+      if (attribute && includeValues) {
+        const attributeWithValues = attribute as Attribute & { values: AttributeValue[] };
+        // Ensure values is a properly structured array
+        if (!Array.isArray(attributeWithValues.values) || attributeWithValues.values.length === 0 || 
+            (Array.isArray(attributeWithValues.values[0]) && attributeWithValues.values.every(Array.isArray))) {
+          attributeWithValues.values = [];
+        }
+      }
 
       if (attribute && !includeValues) {
         await this.redis.set(cacheKey, attribute, 3600);
@@ -110,23 +122,51 @@ export class AttributeRepository {
 
   async findAllAttributes(
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    search: string = '',
+    includeValues: boolean = true
   ): Promise<{ data: any[], total: number }> {
     try {
       const skip = (page - 1) * limit;
+      
+      // Prepare where clause for search
+      const where: Prisma.AttributeWhereInput = {};
+      
+      // Add name search if search term is provided
+      if (search.trim()) {
+        where.name = {
+          contains: search,
+          mode: 'insensitive'  // Case insensitive search
+        };
+      }
       
       const result = await handleDatabaseOperations(() => 
         Promise.all([
           this.prisma.attribute.findMany({
             skip,
             take: limit,
-            orderBy: { name: 'asc' }
+            where,
+            orderBy: { name: 'asc' },
+            include: includeValues ? {
+              values: true
+            } : undefined
           }),
-          this.prisma.attribute.count()
+          this.prisma.attribute.count({ where })
         ])
       );
 
       const [attributes, total] = result || [[], 0];
+
+      // Fix values array if needed
+      if (includeValues && attributes?.length) {
+        attributes.forEach((attr: Attribute & { values?: AttributeValue[] }) => {
+          // Ensure values is a properly structured array
+          if (!Array.isArray(attr.values) || attr.values.length === 0 || 
+              (Array.isArray(attr.values[0]) && attr.values.every(Array.isArray))) {
+            attr.values = [];
+          }
+        });
+      }
 
       return {
         data: attributes,
@@ -143,13 +183,17 @@ export class AttributeRepository {
 
   async updateAttribute(
     id: string,
-    data: Prisma.AttributeUpdateInput
+    data: Prisma.AttributeUpdateInput,
+    includeValues: boolean = false
   ): Promise<Attribute | null> {
     try {
       const attribute = await handleDatabaseOperations(() =>
         this.prisma.attribute.update({
           where: { id },
-          data
+          data,
+          include: includeValues ? {
+            values: true
+          } : undefined
         })
       );
 
@@ -175,22 +219,29 @@ export class AttributeRepository {
     try {
       const attribute = await this.findAttributeById(id);
       if (!attribute) return false;
+      
+      // First step: Delete attribute from products
+      await handleDatabaseOperations(() =>
+        this.prisma.productAttributeValue.deleteMany({
+          where: { attribute_value_id: id }
+        })
+      );
 
-      // Delete all associated category attributes
+      // Second step: Delete all associated category attributes
       await handleDatabaseOperations(() =>
         this.prisma.categoryAttribute.deleteMany({
           where: { attribute_id: id }
         })
       );
 
-      // Delete all attribute values
+      // Third step: Delete all attribute values
       await handleDatabaseOperations(() =>
         this.prisma.attributeValue.deleteMany({
           where: { attribute_id: id }
         })
       );
 
-      // Delete the attribute
+      // Final step: Delete the attribute itself
       await handleDatabaseOperations(() =>
         this.prisma.attribute.delete({ where: { id } })
       );
@@ -200,6 +251,15 @@ export class AttributeRepository {
         `attribute:id:${id}`,
         `attribute:name:${attribute.name}`
       ]);
+      
+      // Also invalidate related category caches
+      if (attribute.categories && attribute.categories.length > 0) {
+        const categoryIds = attribute.categories.map(ca => ca.category_id);
+        const categoryCacheKeys = categoryIds.map(cid => `category:id:${cid}`);
+        if (categoryCacheKeys.length > 0) {
+          await this.redis.pipelineDel(categoryCacheKeys);
+        }
+      }
 
       return true;
     } catch (error) {

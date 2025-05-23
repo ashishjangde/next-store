@@ -21,87 +21,134 @@ export class CategoryService {
 
   async create(categoryCreateDto: CategoryCreateDto, file: Express.Multer.File | undefined) {
     this.logger.debug(`Creating new category: ${categoryCreateDto.name}`);
+    this.logger.debug(`Request data: ${JSON.stringify(categoryCreateDto, null, 2)}`);
     
-    // Check if parent category exists when parent_id is provided
-    if (categoryCreateDto.parent_id) {
-      const parentCategory = await this.categoryRepo.findCategoryById(categoryCreateDto.parent_id);
-      if (!parentCategory) {
-        throw new ApiError(
-          HttpStatus.NOT_FOUND,
-          'Parent category not found'
-        );
+    try {
+      // Validate the input data
+      if (!categoryCreateDto.name) {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'Name is required');
       }
-    }
-    
-    // Generate slug from name
-    const slug = slugify(categoryCreateDto.name);
-    
-    // Prepare category data
-    const categoryData: Prisma.CategoryCreateInput = {
-      name: categoryCreateDto.name,
-      description: categoryCreateDto.description,
-      slug,
-      is_featured: categoryCreateDto.is_featured || false,
-      active: categoryCreateDto.active !== undefined ? categoryCreateDto.active : true,
-      ...(categoryCreateDto.parent_id && {
-        parent: {
-          connect: {
-            id: categoryCreateDto.parent_id
-          }
+      
+      let level = 0; // Default level for root categories
+      
+      // Check if parent category exists when parent_id is provided
+      if (categoryCreateDto.parent_id) {
+        this.logger.debug(`Parent ID provided: ${categoryCreateDto.parent_id}`);
+        
+        const parentCategory = await this.categoryRepo.findCategoryById(categoryCreateDto.parent_id);
+        if (!parentCategory) {
+          throw new ApiError(HttpStatus.NOT_FOUND, `Parent category with ID ${categoryCreateDto.parent_id} not found`);
         }
-      }),
-    };
-    
-    // Handle file upload if provided
-    if (file) {
-      this.logger.debug('Processing category image upload');
-      try {
-        const multerOptions = this.multerS3Service.createMulterOptions('categoryImage');
-        const fileInfo = await new Promise((resolve, reject) => {
-          multerOptions.storage._handleFile(
-            { file } as any,
-            file,
-            (error: any, info: any) => {
-              if (error) {
-                this.logger.error(`Upload handler error: ${error.message}`, error.stack);
-                reject(error);
-              } else {
-                this.logger.debug(`Upload successful: ${JSON.stringify(info)}`);
-                resolve(info);
-              }
-            }
+        
+        // Calculate level based on parent's level
+        level = parentCategory.level + 1;
+        
+        // Check if level would exceed maximum allowed (2)
+        if (level > 2) {
+          throw new ApiError(
+            HttpStatus.BAD_REQUEST, 
+            'Maximum category nesting depth (2) exceeded. Categories can only have a maximum depth of 2 levels.'
           );
-        });
-
-        if (fileInfo) {
-          categoryData.image = (fileInfo as any).url;
         }
-      } catch (error) {
-        this.logger.error(`File upload error: ${error.message}`, error.stack);
+        
+        this.logger.debug(`Setting category level to ${level} (parent level: ${parentCategory.level})`);
+      } else {
+        this.logger.debug('No parent ID provided, this will be a root category (level 0)');
+      }
+      
+      // Generate slug from name
+      const slug = slugify(categoryCreateDto.name);
+      
+      // Set boolean values with proper defaults
+      const is_featured = categoryCreateDto.is_featured === true || false;
+      const active = categoryCreateDto.active !== false; // Default to true if not explicitly set to false
+    
+      // Prepare category data with level (computed, not from DTO)
+      const categoryData: Prisma.CategoryCreateInput = {
+        name: categoryCreateDto.name,
+        description: categoryCreateDto.description || null,
+        slug,
+        level,
+        is_featured,
+        active,
+        ...(categoryCreateDto.parent_id && {
+          parent: {
+            connect: {
+              id: categoryCreateDto.parent_id
+            }
+          }
+        }),
+      };
+      
+      this.logger.debug(`Category data being sent to repository: ${JSON.stringify({
+        name: categoryData.name,
+        description: categoryData.description,
+        slug: categoryData.slug,
+        level,
+        is_featured: categoryData.is_featured,
+        active: categoryData.active,
+        parent_id: categoryCreateDto.parent_id
+      })}`);
+      
+      // Handle file upload if provided
+      if (file) {
+        try {
+          const multerOptions = this.multerS3Service.createMulterOptions('categoryImage');
+          
+          const fileInfo = await new Promise((resolve, reject) => {
+            multerOptions.storage._handleFile(
+              { file } as any,
+              file,
+              (error: any, info: any) => {
+                if (error) {
+                  reject(error);
+                } else {
+                  resolve(info);
+                }
+              }
+            );
+          });
+
+          if (fileInfo) {
+            categoryData.image = (fileInfo as any).url;
+          }
+        } catch (error) {
+          this.logger.error(`File upload error: ${error.message}`);
+          throw new ApiError(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            'Failed to upload category image'
+          );
+        }
+      }
+      
+      // Create the category
+      const category = await this.categoryRepo.createCategory(categoryData);
+      
+      if (!category) {
         throw new ApiError(
           HttpStatus.INTERNAL_SERVER_ERROR,
-          'Failed to upload category image'
+          'Failed to create category'
         );
       }
-    }
-    const category = await this.categoryRepo.createCategory(categoryData);
-    
-    if (!category) {
+      
+      return plainToClass(CategoryResponseDto, category, {
+        excludeExtraneousValues: false,
+        enableImplicitConversion: true
+      });
+    } catch (error) {
+      this.logger.error(`Error creating category: ${error.message}`, error.stack);
+      if (error instanceof ApiError) {
+        throw error;
+      }
       throw new ApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to create category'
+        `Failed to create category: ${error.message}`
       );
     }
-    
-    this.logger.debug(`Category created successfully: ${category.id}`);
-    return plainToClass(CategoryResponseDto, category, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
   }
 
-  async getCategoryBySlug(slug: string, includeChildren: boolean = false, includeProducts: boolean = false, includeAttributes: boolean = false) {
-    this.logger.debug(`Getting category by slug: ${slug}, includeChildren: ${includeChildren}, includeProducts: ${includeProducts}, includeAttributes: ${includeAttributes}`);
+  async getCategoryBySlug(slug: string, includeProducts: boolean = false, includeAttributes: boolean = false) {
+    this.logger.debug(`Getting category by slug: ${slug}, includeProducts: ${includeProducts}, includeAttributes: ${includeAttributes}`);
     
     try {
       const category = await this.categoryRepo.findCategoryBySlug(
@@ -117,29 +164,12 @@ export class CategoryService {
         );
       }
       
-      // If we don't need to include children or children are already included, return as is
-      if (!includeChildren || (category.children && category.children.length > 0)) {
-        return plainToClass(CategoryResponseDto, category, {
-          excludeExtraneousValues: false,
-          enableImplicitConversion: true
-        });
+      // Level 2 categories shouldn't have children
+      if (category.level === 2) {
+        category.children = [];
       }
       
-      // Otherwise, fetch children explicitly
-      const { data: children } = await this.categoryRepo.findAllCategories(
-        1, 
-        100, 
-        category.id,
-        false // Only include active children
-      );
-      
-      // Add children to the category
-      const result = {
-        ...category,
-        children: children || []
-      };
-      
-      return plainToClass(CategoryResponseDto, result, {
+      return plainToClass(CategoryResponseDto, category, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true
       });
@@ -155,116 +185,63 @@ export class CategoryService {
       );
     }
   }
-
-  async getAllCategories(page: number = 1, limit: number = 10, parentId?: string, includeInactive: boolean = false, includeProducts: boolean = false, includeAttributes: boolean = false) {
+  
+  async getCategoryById(id: string, includeInactive: boolean = false, includeProducts: boolean = false, includeAttributes: boolean = false) {
     try {
-      const result = await this.categoryRepo.findAllCategories(
-        page, 
-        limit, 
-        parentId, 
+      // Get the category with its children
+      const category = await this.categoryRepo.findCategoryWithChildren(
+        id, 
         includeInactive,
         includeProducts,
         includeAttributes
       );
       
-      return {
-        data: plainToClass(CategoryResponseDto, result.data, {
-          excludeExtraneousValues: false,
-          enableImplicitConversion: true
-        }),
-        total: result.total,
-        page,
-        limit
-      };
-    } catch (error) {
-      this.logger.error(`Error getting categories: ${error.message}`, error.stack);
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to retrieve categories'
-      );
-    }
-  }
-
-  async getCategoryTree() {
-    try {
-      // First, get all root categories (those without a parent)
-      const { data: rootCategories } = await this.categoryRepo.findAllCategories(
-        1, 
-        1000, // Large limit to get all root categories
-        undefined, // Changed from null to undefined for parent_id
-        false // Only active categories
-      );
+      if (!category) {
+        throw new ApiError(
+          HttpStatus.NOT_FOUND,
+          `Category with id '${id}' not found`
+        );
+      }
       
-      // For each root category, recursively fetch its children
-      const categoryTree = await Promise.all(
-        rootCategories.map(async (rootCategory) => {
-          return this.buildCategorySubtree(rootCategory);
-        })
-      );
+      // Level 2 categories shouldn't have children
+      if (category.level === 2) {
+        category.children = [];
+      }
       
-      return plainToClass(CategoryResponseDto, categoryTree, {
+      return plainToClass(CategoryResponseDto, category, {
         excludeExtraneousValues: false,
         enableImplicitConversion: true
       });
     } catch (error) {
-      this.logger.error(`Error getting category tree: ${error.message}`, error.stack);
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      this.logger.error(`Error getting category by ID: ${error.message}`, error.stack);
       throw new ApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to retrieve category tree'
+        'Failed to retrieve category'
       );
     }
   }
 
-  private async buildCategorySubtree(category: any) {
-    // Fetch children for this category
-    const { data: children } = await this.categoryRepo.findAllCategories(
-      1,
-      1000, // Large limit to get all children
-      category.id,
-      false // Only active categories
-    );
-    
-    // If this category has children, recursively build subtree for each child
-    if (children && children.length > 0) {
-      const childrenWithSubtrees = await Promise.all(
-        children.map(async (child) => {
-          return this.buildCategorySubtree(child);
-        })
-      );
-      
-      return {
-        ...category,
-        children: childrenWithSubtrees
-      };
-    }
-    
-    // If no children, return the category as is
-    return category;
-  }
-
-  async getTopLevelCategories(includeInactive: boolean = false, includeProducts: boolean = false, includeAttributes: boolean = false) {
+  async getRootCategories(includeInactive: boolean = false, includeProducts: boolean = false, includeAttributes: boolean = false) {
     try {
-      const { data: rootCategories, total } = await this.categoryRepo.findAllCategories(
-        1, 
-        1000,
-        undefined,
+      const rootCategories = await this.categoryRepo.findRootCategories(
         includeInactive,
         includeProducts,
         includeAttributes
       );
       
-      return {
-        data: plainToClass(CategoryResponseDto, rootCategories, {
-          excludeExtraneousValues: false,
-          enableImplicitConversion: true
-        }),
-        total
-      };
+      return plainToClass(CategoryResponseDto, rootCategories, {
+        excludeExtraneousValues: false,
+        enableImplicitConversion: true
+      });
     } catch (error) {
-      this.logger.error(`Error getting top level categories: ${error.message}`, error.stack);
+      this.logger.error(`Error getting root categories: ${error.message}`, error.stack);
       throw new ApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to retrieve top level categories'
+        'Failed to retrieve root categories'
       );
     }
   }
@@ -275,6 +252,14 @@ export class CategoryService {
       const category = await this.categoryRepo.findCategoryById(categoryId);
       if (!category) {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Category not found');
+      }
+      
+      // Check if category is level 2 (can have attributes)
+      if (category.level !== 2) {
+        throw new ApiError(
+          HttpStatus.BAD_REQUEST, 
+          'Attributes can only be added to level 2 categories'
+        );
       }
 
       // Add the attribute to the category
@@ -312,6 +297,14 @@ export class CategoryService {
       if (!category) {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Category not found');
       }
+      
+      // Check if category is level 2 (can have attributes)
+      if (category.level !== 2) {
+        throw new ApiError(
+          HttpStatus.BAD_REQUEST, 
+          'Only level 2 categories can have attributes'
+        );
+      }
 
       // Remove the attribute from the category
       const success = await this.categoryRepo.removeAttributeFromCategory(categoryId, attributeId);
@@ -343,27 +336,53 @@ export class CategoryService {
 
   async updateCategory(id: string, updateDto: CategoryUpdateDto, file?: Express.Multer.File) {
     try {
+      this.logger.debug(`Updating category with ID: ${id}`);
+      
       // Check if the category exists
       const existingCategory = await this.categoryRepo.findCategoryById(id);
       if (!existingCategory) {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Category not found');
       }
       
-      // Check if parent exists when parent_id is provided
-      if (updateDto.parent_id) {
-        // Prevent circular reference (category can't be its own parent)
-        if (updateDto.parent_id === id) {
+      // Calculate new level if parent is changing
+      let newLevel = existingCategory.level;
+      
+      if (updateDto.parent_id !== undefined) {
+        // If parent_id is null/empty, this becomes a root category
+        if (!updateDto.parent_id) {
+          newLevel = 0;
+        } else if (updateDto.parent_id !== existingCategory.parent_id) {
+          // Prevent circular reference
+          if (updateDto.parent_id === id) {
+            throw new ApiError(HttpStatus.BAD_REQUEST, 'Category cannot be its own parent');
+          }
+          
+          // Get parent to determine level
+          const parentCategory = await this.categoryRepo.findCategoryById(updateDto.parent_id);
+          if (!parentCategory) {
+            throw new ApiError(HttpStatus.NOT_FOUND, 'Parent category not found');
+          }
+          
+          // Calculate new level
+          newLevel = parentCategory.level + 1;
+          
+          // Check if new level would exceed maximum (2)
+          if (newLevel > 2) {
+            throw new ApiError(
+              HttpStatus.BAD_REQUEST,
+              'Maximum category nesting depth (2) exceeded'
+            );
+          }
+        }
+      }
+      
+      // Check if the category has children and is trying to become level 2
+      if (newLevel === 2) {
+        const hasChildren = await this.categoryRepo.categoryHasChildren(id);
+        if (hasChildren) {
           throw new ApiError(
             HttpStatus.BAD_REQUEST,
-            'Category cannot be its own parent'
-          );
-        }
-        
-        const parentCategory = await this.categoryRepo.findCategoryById(updateDto.parent_id);
-        if (!parentCategory) {
-          throw new ApiError(
-            HttpStatus.NOT_FOUND,
-            'Parent category not found'
+            'Cannot change to level 2: this category has children. Level 2 categories cannot have children.'
           );
         }
       }
@@ -374,11 +393,14 @@ export class CategoryService {
         description: updateDto.description,
         is_featured: updateDto.is_featured,
         active: updateDto.active,
-        ...(updateDto.parent_id && {
-          parent: {
+        level: newLevel, // Update the level
+        ...(updateDto.parent_id !== undefined && {
+          parent: updateDto.parent_id ? {
             connect: {
               id: updateDto.parent_id
             }
+          } : {
+            disconnect: true
           }
         })
       };
@@ -390,7 +412,6 @@ export class CategoryService {
       
       // Handle file upload if provided
       if (file) {
-        this.logger.debug('Processing category image upload');
         try {
           // Delete old image if it exists
           if (existingCategory.image) {
@@ -398,16 +419,15 @@ export class CategoryService {
           }
           
           const multerOptions = this.multerS3Service.createMulterOptions('categoryImage');
+          
           const fileInfo = await new Promise((resolve, reject) => {
             multerOptions.storage._handleFile(
               { file } as any,
               file,
               (error: any, info: any) => {
                 if (error) {
-                  this.logger.error(`Upload handler error: ${error.message}`, error.stack);
                   reject(error);
                 } else {
-                  this.logger.debug(`Upload successful: ${JSON.stringify(info)}`);
                   resolve(info);
                 }
               }
@@ -418,7 +438,6 @@ export class CategoryService {
             updateData.image = (fileInfo as any).url;
           }
         } catch (error) {
-          this.logger.error(`File upload error: ${error.message}`, error.stack);
           throw new ApiError(
             HttpStatus.INTERNAL_SERVER_ERROR,
             'Failed to upload category image'
@@ -445,10 +464,59 @@ export class CategoryService {
         throw error;
       }
       
-      this.logger.error(`Error updating category: ${error.message}`, error.stack);
       throw new ApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to update category'
+        `Failed to update category: ${error.message}`
+      );
+    }
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    try {
+      // Check if the category exists
+      const category = await this.categoryRepo.findCategoryById(id);
+      if (!category) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Category not found');
+      }
+      
+      // Check if the category has child categories
+      const hasChildren = await this.categoryRepo.categoryHasChildren(id);
+      if (hasChildren) {
+        throw new ApiError(
+          HttpStatus.BAD_REQUEST,
+          'Cannot delete category with child categories. Please move or delete the child categories first.'
+        );
+      }
+      
+      // Delete the category's image from storage if it exists
+      if (category.image) {
+        try {
+          await this.multerS3Service.deleteFile(category.image);
+        } catch (error) {
+          // Just log the error but continue with category deletion
+          this.logger.error(`Failed to delete category image: ${error.message}`);
+        }
+      }
+      
+      // Delete the category
+      const result = await this.categoryRepo.deleteCategory(id);
+      
+      if (!result) {
+        throw new ApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'Failed to delete category'
+        );
+      }
+      
+      return true;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      throw new ApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        `Failed to delete category: ${error.message}`
       );
     }
   }

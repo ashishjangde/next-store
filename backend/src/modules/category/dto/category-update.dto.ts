@@ -1,33 +1,41 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsString, Length } from 'class-validator';
 
 export class CategoryUpdateDto {
-    @ApiPropertyOptional({ description: 'The name of the category' })
-    @IsString()
-    @IsOptional()
-    name?: string;
+  @ApiProperty({ description: 'Category name', example: 'Electronics', required: false })
+  @IsOptional()
+  @IsString()
+  @Length(2, 100, { message: 'Name must be between 2 and 100 characters' })
+  name?: string;
 
-    @ApiPropertyOptional({ description: 'The description of the category' })
-    @IsString()
-    @IsOptional()
-    description?: string;
+  @ApiProperty({ description: 'Category description', example: 'Electronic devices and gadgets', required: false })
+  @IsOptional()
+  @IsString()
+  description?: string;
 
-    @ApiPropertyOptional({ description: 'The image of the category', format: 'binary' })
-    @IsOptional()
-    image?: any;
+  @ApiProperty({ description: 'Whether the category is featured', example: true, required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  is_featured?: boolean;
 
-    @ApiPropertyOptional({ description: 'Whether the category is featured or not' })
-    @IsBoolean()
-    @IsOptional()
-    is_featured?: boolean;
+  @ApiProperty({ description: 'Whether the category is active', example: true, required: false })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  active?: boolean;
 
-    @ApiPropertyOptional({ description: 'Whether the category is active or not' })
-    @IsBoolean()
-    @IsOptional()
-    active?: boolean;
-
-    @ApiPropertyOptional({ description: 'The ID of the parent category' })
-    @IsString()
-    @IsOptional()
-    parent_id?: string;
+  @ApiProperty({ description: 'Parent category ID', example: '123e4567-e89b-12d3-a456-426614174000', required: false })
+  @IsOptional()
+  @IsString()
+  parent_id?: string;
 }

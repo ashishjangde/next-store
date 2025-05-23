@@ -13,7 +13,10 @@ import { StorageModule } from 'src/common/storage/storage.module';
     StorageModule
   ],
   controllers: [CategoryController],
-  providers: [CategoryService, CategoryRepository],
+  providers: [
+    CategoryService,
+    CategoryRepository
+  ],
   exports: [CategoryService, CategoryRepository]
 })
 export class CategoryModule {}

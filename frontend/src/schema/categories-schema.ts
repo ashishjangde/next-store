@@ -1,24 +1,27 @@
 import { z } from "zod";
 
-export const createCategorySchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
+// Define the schemas with the correct types
+export const categoryCreateSchema = z.object({
+  name: z.string().min(2, "Name is required and must be at least 2 characters"),
   description: z.string().optional(),
-  slug: z.string().min(2, "Slug must be at least 2 characters"),
-  image: z.instanceof(File).optional().nullable(),
-  is_featured: z.boolean().optional().default(false),
-  active: z.boolean().optional().default(true),
-  sort_order: z.number().int().optional().default(0),
+  image: z.instanceof(File).optional(),
+  is_featured: z.boolean().default(false),
+  active: z.boolean().default(true),
+  parent_id: z.string().optional()
 });
 
-export const updateCategorySchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").optional(),
+// Schema for updating a category
+export const categoryUpdateSchema = z.object({
+  name: z.string().min(2, "Name is required and must be at least 2 characters").optional(),
   description: z.string().optional(),
-  slug: z.string().min(2, "Slug must be at least 2 characters").optional(),
-  image: z.instanceof(File).optional().nullable(),
+  image: z.instanceof(File).optional(),
   is_featured: z.boolean().optional(),
   active: z.boolean().optional(),
-  sort_order: z.number().int().optional(),
+  parent_id: z.string().optional()
 });
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
-export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+// Schema for adding an attribute to a category
+export const categoryAttributeCreateSchema = z.object({
+  attributeId: z.string(),
+  required: z.boolean().default(false)
+});

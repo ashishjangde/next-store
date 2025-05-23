@@ -114,8 +114,8 @@ export function VendorStatusChangeDialog({
               <Label htmlFor="status" className="text-sm font-medium">
                 Select Status
               </Label>
-              <Select 
-                value={selectedStatus} 
+              <Select
+                value={selectedStatus}
                 onValueChange={setSelectedStatus}
               >
                 <SelectTrigger className="w-full">

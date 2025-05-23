@@ -46,10 +46,12 @@ export class AttributeController {
   @Get()
   @ApiOperation({
     summary: "Get all attributes",
-    description: "Retrieve all attributes with pagination"
+    description: "Retrieve all attributes with pagination and search"
   })
   @ApiQuery({ name: 'page', type: Number, required: false, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', type: Number, required: false, description: 'Items per page (default: 10)' })
+  @ApiQuery({ name: 'search', type: String, required: false, description: 'Search term to filter attributes by name' })
+  @ApiQuery({ name: 'includeValues', type: Boolean, required: false, description: 'Whether to include attribute values (default: true)' })
   @SwaggerResponse({
     status: HttpStatus.OK,
     description: 'Attributes found',
@@ -57,11 +59,17 @@ export class AttributeController {
   })
   async getAllAttributes(
     @Query('page') page?: number,
-    @Query('limit') limit?: number
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+    @Query('includeValues') includeValues?: string
   ): Promise<ApiResponse<{ data: AttributeResponseDto[], total: number, page: number, limit: number }>> {
+    const includeValuesBool = includeValues !== 'false'; // Include values by default
+    
     const result = await this.attributeService.getAllAttributes(
       page ? +page : 1,
-      limit ? +limit : 10
+      limit ? +limit : 10,
+      search || '',
+      includeValuesBool
     );
     
     return new ApiResponse(result);
@@ -77,7 +85,7 @@ export class AttributeController {
     name: 'includeValues',
     type: Boolean,
     required: false,
-    description: 'Whether to include attribute values'
+    description: 'Whether to include attribute values (default: true)'
   })
   @SwaggerResponse({
     status: HttpStatus.OK,
@@ -175,4 +183,67 @@ export class AttributeController {
     const result = await this.attributeService.deleteAttributeValue(id);
     return new ApiResponse<{ success: boolean }>(result);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(Roles.ADMIN)
+  @Patch(':id')
+  @ApiOperation({
+    summary: "Update attribute (Admin only)",
+    description: "Update an existing attribute"
+  })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Attribute successfully updated',
+    schema: ApiCustomResponse(AttributeResponseDto)
+  })
+  @SwaggerResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Attribute not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Attribute not found')
+  })
+  @SwaggerResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Attribute with this name already exists',
+    schema: ApiCustomErrorResponse(HttpStatus.CONFLICT, 'Attribute with this name already exists')
+  })
+  async updateAttribute(
+    @Param('id') id: string,
+    @Body() updateDto: any
+  ): Promise<ApiResponse<AttributeResponseDto>> {
+    const attribute = await this.attributeService.updateAttribute(id, updateDto);
+    return new ApiResponse<AttributeResponseDto>(attribute);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(Roles.ADMIN)
+  @Delete(':id')
+  @ApiOperation({
+    summary: "Delete attribute (Admin only)",
+    description: "Delete an attribute and all its associations from categories and products"
+  })
+  @SwaggerResponse({
+    status: HttpStatus.OK,
+    description: 'Attribute successfully deleted',
+    schema: ApiCustomResponse({ 
+      success: true,
+      deleted: {
+        attribute: "String",
+        productCount: 0,
+        categoryCount: 0
+      }
+    })
+  })
+  @SwaggerResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Attribute not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Attribute not found')
+  })
+  async deleteAttribute(
+    @Param('id', ParseUUIDPipe) id: string
+  ): Promise<ApiResponse<any>> {
+    const result = await this.attributeService.deleteAttribute(id);
+    return new ApiResponse(result);
+  }
+
+
 }

@@ -7,8 +7,8 @@ import { RedisModule } from './common/db/redis/redis.module';
 import { AddressModule } from './modules/address/address.module';
 import { WhishlistModule } from './modules/whishlist/whishlist.module';
 import { CartModule } from './modules/cart/cart.module';
-// import { InventoryModule } from './modules/inventory/inventory.module';
-// import { ProductModule } from './modules/product/product.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { ProductModule } from './modules/product/product.module';
 import { CategoryModule } from './modules/category/category.module';
 import { VendorModule } from './modules/vendor/vendor.module';
 import { AttributeModule } from './modules/attribute/attribute.module';
@@ -22,8 +22,8 @@ import { AttributeModule } from './modules/attribute/attribute.module';
     SessionModule,
     CategoryModule,
     AttributeModule,
-    // ProductModule,
-    // InventoryModule,
+    ProductModule,
+    InventoryModule,
     CartModule,
     WhishlistModule,
     AddressModule,

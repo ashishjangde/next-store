@@ -7,13 +7,15 @@ import { AttributeResponseDto } from './dto/attribute-response.dto';
 import { AttributeCreateDto } from './dto/attribute-create.dto';
 import { AttributeValueCreateDto } from './dto/attribute-value-create.dto';
 import { AttributeValueResponseDto } from './dto/attribute-value-response.dto';
+import { PrismaService } from 'src/common/db/prisma/prisma.service';
 
 @Injectable()
 export class AttributeService {
   private readonly logger = new Logger(AttributeService.name);
 
   constructor(
-    private readonly attributeRepo: AttributeRepository
+    private readonly attributeRepo: AttributeRepository,
+    private readonly prisma: PrismaService // Add PrismaService to constructor
   ) {}
 
   async createAttribute(createDto: AttributeCreateDto) {
@@ -61,12 +63,34 @@ export class AttributeService {
     }
   }
 
-  async getAllAttributes(page: number = 1, limit: number = 10) {
+  async getAllAttributes(
+    page: number = 1, 
+    limit: number = 10, 
+    search: string = '',
+    includeValues: boolean = true
+  ) {
     try {
-      const result = await this.attributeRepo.findAllAttributes(page, limit);
+      const result = await this.attributeRepo.findAllAttributes(
+        page, 
+        limit,
+        search,
+        includeValues
+      );
       
+      // Process data to ensure values are correctly formatted
+      const processedData = result.data.map(attribute => {
+        // Ensure values is always an array
+        if (includeValues) {
+          if (!attribute.values || !Array.isArray(attribute.values) || 
+              (Array.isArray(attribute.values[0]) && attribute.values.every(Array.isArray))) {
+            attribute.values = [];
+          }
+        }
+        return attribute;
+      });
+
       return {
-        data: plainToClass(AttributeResponseDto, result.data, {
+        data: plainToClass(AttributeResponseDto, processedData, {
           excludeExtraneousValues: false,
           enableImplicitConversion: true
         }),
@@ -89,6 +113,14 @@ export class AttributeService {
       
       if (!attribute) {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Attribute not found');
+      }
+      
+      // Fix values structure if needed
+      if (includeValues) {
+        if (!attribute.values || !Array.isArray(attribute.values) || 
+            (Array.isArray(attribute.values[0]) && attribute.values.every(Array.isArray))) {
+          attribute.values = [];
+        }
       }
       
       return plainToClass(AttributeResponseDto, attribute, {
@@ -210,6 +242,123 @@ export class AttributeService {
       throw new ApiError(
         HttpStatus.INTERNAL_SERVER_ERROR,
         'Failed to delete attribute value'
+      );
+    }
+  }
+
+  async updateAttribute(id: string, updateDto: any) {
+    try {
+      // Check if attribute exists
+      const existingAttribute = await this.attributeRepo.findAttributeById(id);
+      if (!existingAttribute) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Attribute not found');
+      }
+      
+      // Check for name uniqueness if name is being updated
+      if (updateDto.name && updateDto.name !== existingAttribute.name) {
+        const nameExists = await this.attributeRepo.findAttributeByName(updateDto.name);
+        if (nameExists) {
+          throw new ApiError(HttpStatus.CONFLICT, 'Attribute with this name already exists');
+        }
+      }
+      
+      // Update attribute
+      const attribute = await this.attributeRepo.updateAttribute(id, updateDto, true);
+      
+      if (!attribute) {
+        throw new ApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'Failed to update attribute'
+        );
+      }
+      
+      return plainToClass(AttributeResponseDto, attribute, {
+        excludeExtraneousValues: false,
+        enableImplicitConversion: true
+      });
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      this.logger.error(`Error updating attribute: ${error.message}`, error.stack);
+      throw new ApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to update attribute'
+      );
+    }
+  }
+
+  async deleteAttribute(id: string) {
+    try {
+      // Check if attribute exists
+      const attribute = await this.attributeRepo.findAttributeById(id, true);
+      if (!attribute) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Attribute not found');
+      }
+      
+      // Get products that use this attribute for proper notification
+      let productCount = 0;
+      try {
+        productCount = await this.prisma.productAttributeValue.count({
+          where: { attribute_value_id: id }
+        });
+      } catch (countError) {
+        this.logger.error(`Error counting products with attribute: ${countError.message}`);
+        // Continue with deletion even if count fails
+      }
+
+      // Get categories that use this attribute
+      const categoriesWithAttribute = attribute.categories || [];
+      
+      // Proceed with deletion
+      const success = await this.attributeRepo.deleteAttribute(id);
+      
+      if (!success) {
+        throw new ApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'Failed to delete attribute'
+        );
+      }
+      
+      return { 
+        success: true,
+        deleted: {
+          attribute: attribute.name,
+          productCount,
+          categoryCount: categoriesWithAttribute.length
+        }
+      };
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      this.logger.error(`Error deleting attribute: ${error.message}`, error.stack);
+      throw new ApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to delete attribute'
+      );
+    }
+  }
+
+  // Complete the incomplete method that was causing errors
+  async debugAttribute(id: string) {
+    try {
+      const attribute = await this.attributeRepo.findAttributeById(id, true);
+      if (!attribute) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Attribute not found');
+      }
+      
+      return attribute;
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      
+      throw new ApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to debug attribute'
       );
     }
   }

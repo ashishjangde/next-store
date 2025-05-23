@@ -26,9 +26,24 @@ export class CategoryRepository {
 
   async createCategory(data: Prisma.CategoryCreateInput): Promise<Category | null> {
     try {
+      this.logger.debug(`Creating category with data: ${JSON.stringify({
+        name: data.name,
+        description: data.description,
+        slug: data.slug,
+        level: data.level,
+        parent_id: data.parent?.connect?.id || null
+      })}`);
+      
       const category = await handleDatabaseOperations(() =>
         this.prisma.category.create({ data })
       );
+
+      this.logger.debug(`Category created: ${JSON.stringify({
+        id: category?.id,
+        name: category?.name,
+        level: category?.level,
+        parent_id: category?.parent_id
+      })}`);
 
       if (category) {
         await this.cacheCategory(category);
@@ -53,16 +68,25 @@ export class CategoryRepository {
         this.prisma.category.findUnique({
           where: { id },
           include: includeAttributes ? {
-            attributes: { // Changed from categoryAttributes to attributes (matching Prisma schema relation)
+            attributes: {
               include: {
                 attribute: true
               }
             },
-            children: true,
             parent: true
-          } : undefined
+          } : {
+            parent: true
+          }
         })
       );
+
+      // Log the retrieved category for debugging
+      this.logger.debug(`Retrieved category by ID: ${JSON.stringify({
+        id: category?.id,
+        name: category?.name,
+        level: category?.level,
+        parent_id: category?.parent_id
+      })}`);
 
       if (category && !includeAttributes) {
         await this.redis.set(cacheKey, category, 3600);
@@ -75,7 +99,76 @@ export class CategoryRepository {
     }
   }
 
-  async findCategoryBySlug(slug: string, includeAttributes: boolean = false, includeProducts: boolean = false): Promise<any | null> {
+  async findCategoryWithChildren(
+    id: string, 
+    includeInactive: boolean = false,
+    includeProducts: boolean = false,
+    includeAttributes: boolean = false
+  ): Promise<any | null> {
+    try {
+      const category = await handleDatabaseOperations(() =>
+        this.prisma.category.findUnique({
+          where: { id },
+          include: {
+            attributes: includeAttributes ? {
+              include: {
+                attribute: {
+                  include: {
+                    values: true
+                  }
+                }
+              }
+            } : false,
+            children: {
+              where: includeInactive ? {} : { active: true },
+              include: {
+                children: {
+                  where: includeInactive ? {} : { active: true }
+                }
+              }
+            },
+            parent: true,
+            products: includeProducts ? {
+              where: { is_active: true },
+              select: {
+                id: true,
+                title: true,
+                price: true,
+                images: true
+              }
+            } : false
+          }
+        })
+      );
+      
+      return category;
+    } catch (error) {
+      this.logger.error(`Error finding category with children: ${error.message}`, error);
+      return null;
+    }
+  }
+
+  async categoryHasChildren(id: string): Promise<boolean> {
+    try {
+      const childCount = await handleDatabaseOperations(() =>
+        this.prisma.category.count({
+          where: { parent_id: id }
+        })
+      );
+      
+      // Fix TypeScript error by using a default value of 0 if childCount is null
+      return (childCount ?? 0) > 0;
+    } catch (error) {
+      this.logger.error(`Error checking if category has children: ${error.message}`, error);
+      return false; // Default to false on error
+    }
+  }
+
+  async findCategoryBySlug(
+    slug: string, 
+    includeAttributes: boolean = false, 
+    includeProducts: boolean = false
+  ): Promise<any | null> {
     const cacheKey = `category:slug:${slug}`;
     try {
       const cached = await this.redis.get<Category>(cacheKey);
@@ -109,8 +202,7 @@ export class CategoryRepository {
                 title: true,
                 price: true,
                 images: true
-              },
-              take: 10 // Limit to 10 products per category in the API response
+              }
             } : false
           }
         })
@@ -127,74 +219,51 @@ export class CategoryRepository {
     }
   }
 
-  async findAllCategories(
-    page: number = 1,
-    limit: number = 10,
-    parentId?: string,
+  async findRootCategories(
     includeInactive: boolean = false,
     includeProducts: boolean = false,
     includeAttributes: boolean = false
-  ): Promise<{ data: any[], total: number }> {
+  ): Promise<any[]> {
     try {
-      const skip = (page - 1) * limit;
-      
-      const where: Prisma.CategoryWhereInput = {
-        ...(parentId !== undefined ? { parent_id: parentId } : {}),
-        ...(includeInactive ? {} : { active: true })
-      };
-
-      const result = await handleDatabaseOperations(() => 
-        Promise.all([
-          this.prisma.category.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: { name: 'asc' },
-            include: {
-              children: {
-                where: includeInactive ? {} : { active: true }
-              },
-              attributes: includeAttributes ? {
-                include: {
-                  attribute: {
-                    include: {
-                      values: true
-                    }
+      const rootCategories = await handleDatabaseOperations(() =>
+        this.prisma.category.findMany({
+          where: {
+            parent_id: null,
+            level: 0,
+            ...(includeInactive ? {} : { active: true })
+          },
+          include: {
+            attributes: includeAttributes ? {
+              include: {
+                attribute: {
+                  include: {
+                    values: true
                   }
                 }
-              } : false,
-              products: includeProducts ? {
-                where: { is_active: true },
-                select: {
-                  id: true,
-                  title: true,
-                  price: true,
-                  images: true
-                },
-                take: 10
-              } : false
-            }
-          }),
-          this.prisma.category.count({ where })
-        ])
+              }
+            } : false,
+            children: {
+              where: includeInactive ? {} : { active: true }
+            },
+            products: includeProducts ? {
+              where: { is_active: true },
+              select: {
+                id: true,
+                title: true,
+                price: true,
+                images: true
+              },
+              take: 10 // Limit to 10 products per category
+            } : false
+          },
+          orderBy: { name: 'asc' }
+        })
       );
 
-      if (!result) {
-        return { data: [], total: 0 };
-      }
-
-      const [categories, total] = result;
-
-      return {
-        data: categories,
-        total
-      };
+      return rootCategories || [];
     } catch (error) {
-      this.logger.error(`Error finding all categories: ${error.message}`, error);
-      return {
-        data: [],
-        total: 0
-      };
+      this.logger.error(`Error finding root categories: ${error.message}`, error);
+      return [];
     }
   }
 
@@ -230,30 +299,29 @@ export class CategoryRepository {
 
   async deleteCategory(id: string): Promise<boolean> {
     try {
+      // First get the category to get its slug
       const category = await this.findCategoryById(id);
       if (!category) return false;
-
-      // Delete all associated category attributes
-      await handleDatabaseOperations(() =>
-        this.prisma.categoryAttribute.deleteMany({
-          where: { category_id: id }
-        })
-      );
-
+      
+      // First delete category attributes
+      await this.prisma.categoryAttribute.deleteMany({
+        where: { category_id: id }
+      });
+      
       // Delete the category
-      await handleDatabaseOperations(() =>
-        this.prisma.category.delete({ where: { id } })
-      );
-
+      await this.prisma.category.delete({
+        where: { id }
+      });
+      
       // Clear cache
       await this.redis.pipelineDel([
         `category:id:${id}`,
         `category:slug:${category.slug}`
       ]);
-
+      
       return true;
     } catch (error) {
-      this.logger.error(`Error deleting category: ${error.message}`, error);
+      this.logger.error('Error deleting category:', error);
       return false;
     }
   }
@@ -270,7 +338,7 @@ export class CategoryRepository {
           data: {
             category_id: categoryId,
             attribute_id: attributeId,
-            required // Now matches the schema
+            required
           }
         })
       );
@@ -330,7 +398,7 @@ export class CategoryRepository {
             }
           },
           data: {
-            required // Now matches the schema
+            required
           }
         })
       );

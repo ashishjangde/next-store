@@ -78,6 +78,7 @@ model Category {
   description   String?    @db.Text
   slug          String     @unique
   image         String?
+  level        Int        @default(0) // 0 for root categories, 1 for subcategories,  last 2 .
   is_featured   Boolean    @default(false)
   active        Boolean    @default(true)
   created_at    DateTime   @default(now())
