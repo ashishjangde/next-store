@@ -13,7 +13,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 
 import Link from "next/link";
-import { EditAttributeModal } from "./edit-attribute-modal";
+import { EditAttributeModal } from "../../categories/[categoryId]/_components/edit-attribute-modal";
 import { AttributeDeleteDialog } from "./attribute-delete-dialog";
 
 interface AttributeActionsDropdownProps {

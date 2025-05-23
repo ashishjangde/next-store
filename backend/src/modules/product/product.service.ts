@@ -3,14 +3,13 @@ import { ProductRepository } from 'src/repositories/product-repository';
 import { InventoryRepository } from 'src/repositories/inventory-repository';
 import { CategoryRepository } from 'src/repositories/category-repository';
 import { MulterS3ConfigService } from 'src/common/storage/multer-s3.config';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductType } from '@prisma/client';
 import ApiError from 'src/common/responses/ApiError';
 import { plainToClass } from 'class-transformer';
-import { ProductResponseDto } from './dto/product-response.dto';
+import { ProductResponseDto, ProductListResponseDto } from './dto/product-response.dto';
+import { slugify } from 'src/common/utils/utils';
 import { ProductCreateDto } from './dto/product-create.dto';
 import { ProductUpdateDto } from './dto/product-update.dto';
-import { ProductVariationCreateDto } from './dto/product-variation-create.dto';
-import { ProductVariationResponseDto } from './dto/product-variation-response.dto';
 
 @Injectable()
 export class ProductService {
@@ -25,592 +24,546 @@ export class ProductService {
 
   async createProduct(
     vendorId: string,
-    productCreateDto: ProductCreateDto,
-    files: Express.Multer.File[] = []
-  ) {
-    this.logger.debug(`Creating new product: ${productCreateDto.title}`);
-    
-    // Check if category exists
-    const category = await this.categoryRepo.findCategoryById(productCreateDto.category_id);
-    if (!category) {
-      throw new ApiError(
-        HttpStatus.NOT_FOUND,
-        'Category not found'
-      );
-    }
-    
-    // Upload images
-    let imageUrls: string[] = [];
-    if (files && files.length > 0) {
-      imageUrls = await this.uploadProductImages(files);
-    }
-    
-    // Prepare product data
-    const productData: Prisma.ProductCreateInput = {
-      title: productCreateDto.title,
-      description: productCreateDto.description,
-      sku: productCreateDto.sku,
-      price: productCreateDto.price,
-      brand: productCreateDto.brand,
-      gender: productCreateDto.gender,
-      season: productCreateDto.season,
-      weight: productCreateDto.weight,
-      color_name: productCreateDto.color_name,
-      color_family: productCreateDto.color_family,
-      is_active: productCreateDto.is_active !== undefined ? productCreateDto.is_active : true,
-      images: imageUrls,
-      category: {
-        connect: {
-          id: productCreateDto.category_id
-        }
-      },
-      Vendor: {
-        connect: {
-          id: vendorId
-        }
+    createDto: ProductCreateDto,
+    files?: Express.Multer.File[]
+  ): Promise<ProductResponseDto> {
+    try {
+      // Validate category level
+      if (!createDto.category_id) {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'Category ID is required');
       }
-    };
-    
-    // Create product in database
-    const product = await this.productRepo.createProduct(productData);
-    
-    if (!product) {
-      // Cleanup uploaded images if product creation fails
-      await this.deleteProductImages(imageUrls);
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to create product'
-      );
-    }
-    
-    // Create inventory record
-    if (productCreateDto.quantity >= 0) {
-      await this.inventoryRepo.createInventory({
-        Product: {
-          connect: {
-            id: product.id
-          }
-        },
-        quantity: productCreateDto.quantity,
-        low_stock_threshold: productCreateDto.low_stock_threshold || 10
-      });
-    }
-    
-    // Add attribute values
-    if (productCreateDto.attribute_value_ids && productCreateDto.attribute_value_ids.length > 0) {
-      for (const attributeValueId of productCreateDto.attribute_value_ids) {
-        await this.productRepo.addAttributeValueToProduct(product.id, attributeValueId);
-      }
-    }
-    
-    this.logger.debug(`Product created successfully: ${product.id}`);
-    
-    // Get complete product with relationships
-    const completeProduct = await this.productRepo.findProductById(
-      product.id,
-      true, // include variations
-      true, // include attributes
-      true, // include inventory
-      true, // include category
-      true  // include vendor
-    );
-    
-    return plainToClass(ProductResponseDto, completeProduct, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
-  }
-
-  async updateProduct(
-    id: string,
-    vendorId: string, // Used to verify the vendor owns this product
-    productUpdateDto: ProductUpdateDto,
-    files: Express.Multer.File[] = [],
-    deleteImageUrls: string[] = []
-  ) {
-    this.logger.debug(`Updating product: ${id}`);
-    
-    // Check if product exists and belongs to this vendor
-    const existingProduct = await this.productRepo.findProductById(id);
-    
-    if (!existingProduct) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    if (existingProduct.vendor_id !== vendorId) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'You are not authorized to update this product'
-      );
-    }
-    
-    // If category_id is provided, check if it exists
-    if (productUpdateDto.category_id) {
-      const category = await this.categoryRepo.findCategoryById(productUpdateDto.category_id);
+      const category = await this.categoryRepo.findCategoryById(createDto.category_id);
       if (!category) {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Category not found');
       }
-    }
-    
-    // Handle image updates
-    let updatedImages = [...existingProduct.images];
-    
-    // Delete images if specified
-    if (deleteImageUrls && deleteImageUrls.length > 0) {
-      for (const imageUrl of deleteImageUrls) {
-        await this.multerS3Service.deleteFile(imageUrl);
-        updatedImages = updatedImages.filter(url => url !== imageUrl);
-      }
-    }
-    
-    // Upload new images
-    if (files && files.length > 0) {
-      const newImageUrls = await this.uploadProductImages(files);
-      updatedImages = [...updatedImages, ...newImageUrls];
-    }
-    
-    // Prepare update data
-    const updateData: Prisma.ProductUpdateInput = {
-      ...productUpdateDto,
-      ...(updatedImages.length > 0 && { images: updatedImages }),
-      ...(productUpdateDto.category_id && {
-        category: {
-          connect: {
-            id: productUpdateDto.category_id
-          }
-        }
-      })
-    };
-    
-    // Update product in database
-    const product = await this.productRepo.updateProduct(id, updateData);
-    
-    if (!product) {
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to update product'
-      );
-    }
-    
-    // Get complete product with relationships
-    const completeProduct = await this.productRepo.findProductById(
-      product.id,
-      true, // include variations
-      true, // include attributes
-      true, // include inventory
-      true, // include category
-      true  // include vendor
-    );
-    
-    return plainToClass(ProductResponseDto, completeProduct, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
-  }
-
-  async getProduct(
-    id: string,
-    includeVariations: boolean = true,
-    includeAttributes: boolean = true,
-    includeInventory: boolean = true,
-    includeCategory: boolean = true,
-    includeVendor: boolean = true
-  ) {
-    this.logger.debug(`Getting product: ${id}`);
-    
-    const product = await this.productRepo.findProductById(
-      id,
-      includeVariations,
-      includeAttributes,
-      includeInventory,
-      includeCategory,
-      includeVendor
-    );
-    
-    if (!product) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    // If the product is archived and inactive, only admin and the vendor should see it
-    if (product.archived && !product.is_active) {
-      // In a real-world scenario, we would check user roles here
-      // For now, we'll allow everyone to see it
-    }
-    
-    return plainToClass(ProductResponseDto, product, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
-  }
-
-  async getAllProducts(
-    page: number = 1,
-    limit: number = 10,
-    filters: Record<string, any> = {},
-    sort: Record<string, 'asc' | 'desc'> = { created_at: 'desc' },
-    includeVariations: boolean = false,
-    includeAttributes: boolean = false,
-    includeInventory: boolean = false,
-    includeCategory: boolean = false
-  ) {
-    this.logger.debug(`Getting all products. Page: ${page}, Limit: ${limit}`);
-    
-    // Public users should only see active, non-archived products
-    const isAdmin = filters.isAdminRequest === true;
-    if (!isAdmin) {
-      filters.is_active = true;
-      filters.archived = false;
-    }
-    delete filters.isAdminRequest;
-    
-    const result = await this.productRepo.findAllProducts(
-      page,
-      limit,
-      filters,
-      sort,
-      includeVariations,
-      includeAttributes,
-      includeInventory,
-      includeCategory
-    );
-    
-    return {
-      data: plainToClass(ProductResponseDto, result.data, {
-        excludeExtraneousValues: false,
-        enableImplicitConversion: true
-      }),
-      total: result.total,
-      page,
-      limit
-    };
-  }
-
-  async deleteProduct(id: string, vendorId: string, permanent: boolean = false) {
-    this.logger.debug(`Deleting product: ${id}, Permanent: ${permanent}`);
-    
-    // Check if product exists and belongs to this vendor
-    const existingProduct = await this.productRepo.findProductById(id);
-    
-    if (!existingProduct) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    if (existingProduct.vendor_id !== vendorId) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'You are not authorized to delete this product'
-      );
-    }
-    
-    let success = false;
-    
-    if (permanent) {
-      // Delete product images
-      if (existingProduct.images && existingProduct.images.length > 0) {
-        await this.deleteProductImages(existingProduct.images);
-      }
       
-      // Hard delete
-      success = await this.productRepo.hardDeleteProduct(id);
-    } else {
-      // Soft delete
-      success = await this.productRepo.softDeleteProduct(id);
-    }
-    
-    if (!success) {
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to delete product'
-      );
-    }
-    
-    return { success: true };
-  }
+      if (category.level !== 2) {
+        throw new ApiError(HttpStatus.BAD_REQUEST, 'Products can only be added to level 2 categories');
+      }
 
-  async addVariation(
-    productId: string,
-    vendorId: string,
-    variationDto: ProductVariationCreateDto,
-    files: Express.Multer.File[] = []
-  ) {
-    this.logger.debug(`Adding variation to product: ${productId}`);
-    
-    // Check if product exists and belongs to this vendor
-    const existingProduct = await this.productRepo.findProductById(productId);
-    
-    if (!existingProduct) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    if (existingProduct.vendor_id !== vendorId) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'You are not authorized to update this product'
-      );
-    }
-    
-    // Check if variation with this size and color already exists
-    const existingVariations = await this.productRepo.findProductById(productId, true);
-    const sizeColorMatch = existingVariations.Variations?.find(
-      v => v.size === variationDto.size && v.color === variationDto.color
-    );
-    
-    if (sizeColorMatch) {
-      throw new ApiError(
-        HttpStatus.CONFLICT,
-        `A variation with size ${variationDto.size} and color ${variationDto.color} already exists`
-      );
-    }
-    
-    // Upload variation images
-    let imageUrls: string[] = [];
-    if (files && files.length > 0) {
-      imageUrls = await this.uploadProductImages(files);
-    }
-    
-    // Create variation
-    const variation = await this.productRepo.createProductVariation({
-      size: variationDto.size,
-      color: variationDto.color,
-      sku: variationDto.sku,
-      price_mod: variationDto.price_mod,
-      images: imageUrls,
-      Product: {
-        connect: {
-          id: productId
+      // Validate parent product if parent_id is provided
+      if (createDto.parent_id) {
+        const parentProduct = await this.productRepo.findProductById(createDto.parent_id);
+        if (!parentProduct) {
+          throw new ApiError(HttpStatus.NOT_FOUND, 'Parent product not found');
+        }
+        
+        if (parentProduct.product_type !== ProductType.PARENT) {
+          throw new ApiError(HttpStatus.BAD_REQUEST, 'Parent product must have type PARENT');
+        }
+        
+        if (parentProduct.vendor_id !== vendorId) {
+          throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot create variant for another vendor\'s product');
         }
       }
-    });
-    
-    if (!variation) {
-      // Cleanup uploaded images if variation creation fails
-      await this.deleteProductImages(imageUrls);
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to create product variation'
-      );
-    }
-    
-    // Create inventory record for this variation
-    if (variationDto.quantity >= 0) {
-      await this.inventoryRepo.createVariationInventory({
-        Variation: {
-          connect: {
-            id: variation.id
+
+      // Generate slug
+      const slug = slugify(createDto.title);
+
+      // Handle file uploads
+      let imageUrls: string[] = [];
+      if (files && files.length > 0) {
+        try {
+          const multerOptions = this.multerS3Service.createMulterOptions('productImages');
+          
+          for (const file of files) {
+            const fileInfo = await new Promise((resolve, reject) => {
+              multerOptions.storage._handleFile(
+                { file } as any,
+                file,
+                (error: any, info: any) => {
+                  if (error) reject(error);
+                  else resolve(info);
+                }
+              );
+            });
+            
+            if (fileInfo) {
+              imageUrls.push((fileInfo as any).url);
+            }
           }
-        },
-        quantity: variationDto.quantity,
-        low_stock_threshold: variationDto.low_stock_threshold || 5,
+        } catch (error) {
+          throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload product images');
+        }
+      }
+
+      // Prepare product data
+      const productData: Prisma.ProductCreateInput = {
+        title: createDto.title,
+        description: createDto.description,
+        slug,
+        sku: createDto.sku,
+        price: createDto.price,
+        brand: createDto.brand,
+        season: createDto.season,
+        weight: createDto.weight,
+        product_type: createDto.product_type,
+        images: imageUrls,
+        Vendor: { connect: { id: vendorId } },
+        category: { connect: { id: createDto.category_id } },
+        ...(createDto.parent_id && {
+          parent: { connect: { id: createDto.parent_id } }
+        })
+      };
+
+      const product = await this.productRepo.createProduct(productData);
+      if (!product) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to create product');
+      }
+
+      // Create inventory
+      await this.inventoryRepo.createInventory({
+        product_id: product.id,
+        quantity: createDto.initial_quantity || 0,
+        low_stock_threshold: createDto.low_stock_threshold || 10,
         reserved_quantity: 0
       });
-    }
-    
-    // Get complete variation with inventory
-    const completeVariation = await this.productRepo.findProductVariationById(
-      variation.id,
-      true // include inventory
-    );
-    
-    return plainToClass(ProductVariationResponseDto, completeVariation, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
-  }
 
-  async deleteVariation(
-    productId: string,
-    variationId: string,
-    vendorId: string
-  ) {
-    this.logger.debug(`Deleting variation: ${variationId} from product: ${productId}`);
-    
-    // Check if product exists and belongs to this vendor
-    const existingProduct = await this.productRepo.findProductById(productId);
-    
-    if (!existingProduct) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    if (existingProduct.vendor_id !== vendorId) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'You are not authorized to update this product'
-      );
-    }
-    
-    // Check if variation exists and belongs to this product
-    const variation = await this.productRepo.findProductVariationById(variationId);
-    
-    if (!variation) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Variation not found');
-    }
-    
-    if (variation.product_id !== productId) {
-      throw new ApiError(
-        HttpStatus.BAD_REQUEST,
-        'Variation does not belong to this product'
-      );
-    }
-    
-    // Delete variation images
-    if (variation.images && variation.images.length > 0) {
-      await this.deleteProductImages(variation.images);
-    }
-    
-    // Delete variation
-    const success = await this.productRepo.deleteProductVariation(variationId);
-    
-    if (!success) {
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to delete variation'
-      );
-    }
-    
-    return { success: true };
-  }
-
-  async addAttributeValueToProduct(productId: string, attributeValueId: string, vendorId: string) {
-    this.logger.debug(`Adding attribute value to product: ${productId}`);
-    
-    // Check if product exists and belongs to this vendor
-    const existingProduct = await this.productRepo.findProductById(productId);
-    
-    if (!existingProduct) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    if (existingProduct.vendor_id !== vendorId) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'You are not authorized to update this product'
-      );
-    }
-    
-    // Add attribute value
-    const success = await this.productRepo.addAttributeValueToProduct(
-      productId,
-      attributeValueId
-    );
-    
-    if (!success) {
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to add attribute value to product'
-      );
-    }
-    
-    // Get updated product
-    const updatedProduct = await this.productRepo.findProductById(
-      productId,
-      false, // include variations
-      true,  // include attributes
-      false, // include inventory
-      false, // include category
-      false  // include vendor
-    );
-    
-    return plainToClass(ProductResponseDto, updatedProduct, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
-  }
-
-  async removeAttributeValueFromProduct(productId: string, attributeValueId: string, vendorId: string) {
-    this.logger.debug(`Removing attribute value from product: ${productId}`);
-    
-    // Check if product exists and belongs to this vendor
-    const existingProduct = await this.productRepo.findProductById(productId);
-    
-    if (!existingProduct) {
-      throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
-    }
-    
-    if (existingProduct.vendor_id !== vendorId) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'You are not authorized to update this product'
-      );
-    }
-    
-    // Remove attribute value
-    const success = await this.productRepo.removeAttributeValueFromProduct(
-      productId,
-      attributeValueId
-    );
-    
-    if (!success) {
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to remove attribute value from product'
-      );
-    }
-    
-    // Get updated product
-    const updatedProduct = await this.productRepo.findProductById(
-      productId,
-      false, // include variations
-      true,  // include attributes
-      false, // include inventory
-      false, // include category
-      false  // include vendor
-    );
-    
-    return plainToClass(ProductResponseDto, updatedProduct, {
-      excludeExtraneousValues: false,
-      enableImplicitConversion: true
-    });
-  }
-
-  // Helper methods for image handling
-  private async uploadProductImages(files: Express.Multer.File[]): Promise<string[]> {
-    this.logger.debug(`Uploading ${files.length} product images`);
-    
-    const uploadPromises = files.map(async (file) => {
-      try {
-        const multerOptions = this.multerS3Service.createMulterOptions('productImages');
-        return new Promise<string>((resolve, reject) => {
-          multerOptions.storage._handleFile(
-            { file } as any,
-            file,
-            (error: any, info: any) => {
-              if (error) {
-                this.logger.error(`Upload handler error: ${error.message}`, error.stack);
-                reject(error);
-              } else {
-                this.logger.debug(`Upload successful: ${JSON.stringify(info)}`);
-                resolve(info.url);
-              }
-            }
-          );
-        });
-      } catch (error) {
-        this.logger.error(`File upload error: ${error.message}`, error.stack);
-        throw error;
+      // Add attributes if provided
+      if (createDto.attribute_value_ids && createDto.attribute_value_ids.length > 0) {
+        for (const attributeValueId of createDto.attribute_value_ids) {
+          await this.productRepo.addAttributeToProduct(product.id, attributeValueId);
+        }
       }
-    });
-    
-    try {
-      return await Promise.all(uploadPromises);
-    } catch (error) {
-      this.logger.error(`Error in batch image upload: ${error.message}`, error.stack);
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'Failed to upload product images'
+
+      // Fetch complete product with relations
+      const completeProduct = await this.productRepo.findProductById(
+        product.id,
+        true, // includeCategory
+        true, // includeAttributes
+        false // includeChildren
       );
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(completeProduct));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error creating product: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to create product');
     }
   }
 
-  private async deleteProductImages(imageUrls: string[]): Promise<void> {
-    this.logger.debug(`Deleting ${imageUrls.length} product images`);
-    
-    const deletePromises = imageUrls.map(url => this.multerS3Service.deleteFile(url));
-    
+  async getProductById(
+    id: string,
+    includeCategory = false,
+    includeAttributes = false,
+    includeChildren = false
+  ): Promise<ProductResponseDto> {
     try {
-      await Promise.all(deletePromises);
+      const product = await this.productRepo.findProductById(
+        id,
+        includeCategory,
+        includeAttributes,
+        includeChildren
+      );
+
+      if (!product || !product.is_active || product.archived) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
+      }
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(product));
     } catch (error) {
-      this.logger.error(`Error deleting images: ${error.message}`, error.stack);
-      // Log but don't throw, as we don't want to fail the operation if image cleanup fails
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error getting product by ID: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve product');
     }
+  }
+
+  async getProductBySlug(
+    slug: string,
+    includeCategory = false,
+    includeAttributes = false,
+    includeChildren = false
+  ): Promise<ProductResponseDto> {
+    try {
+      const product = await this.productRepo.findProductBySlug(
+        slug,
+        includeCategory,
+        includeAttributes,
+        includeChildren
+      );
+
+      if (!product || !product.is_active || product.archived) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
+      }
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(product));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error getting product by slug: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve product');
+    }
+  }
+
+  async getAllProducts(options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    categoryId?: string;
+    vendorId?: string;
+    productType?: ProductType;
+    includeCategory?: boolean;
+    includeAttributes?: boolean;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<ProductListResponseDto> {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        categoryId,
+        vendorId,
+        productType,
+        includeCategory = false,
+        includeAttributes = false,
+        sortBy = 'created_at',
+        sortOrder = 'desc'
+      } = options;
+
+      const skip = (page - 1) * limit;
+
+      const result = await this.productRepo.findAllProducts({
+        skip,
+        take: limit,
+        search,
+        categoryId,
+        vendorId,
+        productType,
+        includeCategory,
+        includeAttributes,
+        sortBy,
+        sortOrder
+      });
+
+      if (!result) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve products');
+      }
+
+      const transformedProducts = result.products.map(product => 
+        this.transformProductResponse(product)
+      );
+
+      return plainToClass(ProductListResponseDto, {
+        products: transformedProducts,
+        total: result.total,
+        page,
+        limit,
+        totalPages: Math.ceil(result.total / limit)
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error getting all products: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve products');
+    }
+  }
+
+  async getVendorVariants(vendorId: string, options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<ProductListResponseDto> {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        sortBy = 'created_at',
+        sortOrder = 'desc'
+      } = options;
+
+      const skip = (page - 1) * limit;
+
+      const result = await this.productRepo.findAllProducts({
+        skip,
+        take: limit,
+        search,
+        vendorId,
+        productType: ProductType.VARIANT,
+        includeCategory: true,
+        includeAttributes: true,
+        sortBy,
+        sortOrder
+      });
+
+      if (!result) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve variants');
+      }
+
+      const transformedProducts = result.products.map(product => 
+        this.transformProductResponse(product)
+      );
+
+      return plainToClass(ProductListResponseDto, {
+        products: transformedProducts,
+        total: result.total,
+        page,
+        limit,
+        totalPages: Math.ceil(result.total / limit)
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error getting vendor variants: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve variants');
+    }
+  }
+
+  async updateProduct(
+    vendorId: string,
+    productId: string,
+    updateDto: ProductUpdateDto,
+    files?: Express.Multer.File[]
+  ): Promise<ProductResponseDto> {
+    try {
+      const existingProduct = await this.productRepo.findProductById(productId);
+      if (!existingProduct) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
+      }
+
+      if (existingProduct.vendor_id !== vendorId) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot update another vendor\'s product');
+      }
+
+      // Handle file uploads
+      let imageUrls = existingProduct.images;
+      if (files && files.length > 0) {
+        try {
+          const multerOptions = this.multerS3Service.createMulterOptions('productImages');
+          
+          // Delete old images
+          for (const oldImage of existingProduct.images) {
+            await this.multerS3Service.deleteFile(oldImage);
+          }
+
+          imageUrls = [];
+          for (const file of files) {
+            const fileInfo = await new Promise((resolve, reject) => {
+              multerOptions.storage._handleFile(
+                { file } as any,
+                file,
+                (error: any, info: any) => {
+                  if (error) reject(error);
+                  else resolve(info);
+                }
+              );
+            });
+            
+            if (fileInfo) {
+              imageUrls.push((fileInfo as any).url);
+            }
+          }
+        } catch (error) {
+          throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload product images');
+        }
+      }
+
+      const updateData: Prisma.ProductUpdateInput = {
+        ...updateDto,
+        images: imageUrls,
+        ...(updateDto.title && { slug: slugify(updateDto.title) })
+      };
+
+      const updatedProduct = await this.productRepo.updateProduct(productId, updateData);
+      if (!updatedProduct) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to update product');
+      }
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(updatedProduct));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error updating product: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to update product');
+    }
+  }
+
+  async deleteProduct(vendorId: string, productId: string): Promise<boolean> {
+    try {
+      const product = await this.productRepo.findProductById(productId);
+      if (!product) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
+      }
+
+      if (product.vendor_id !== vendorId) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot delete another vendor\'s product');
+      }
+
+      // Delete product images
+      for (const image of product.images) {
+        try {
+          await this.multerS3Service.deleteFile(image);
+        } catch (error) {
+          this.logger.error(`Failed to delete image: ${error.message}`);
+        }
+      }
+
+      const success = await this.productRepo.deleteProduct(productId);
+      if (!success) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to delete product');
+      }
+
+      return true;
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error deleting product: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to delete product');
+    }
+  }
+
+  async addAttributeToProduct(vendorId: string, productId: string, attributeValueId: string): Promise<ProductResponseDto> {
+    try {
+      const product = await this.productRepo.findProductById(productId);
+      if (!product) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
+      }
+
+      if (product.vendor_id !== vendorId) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot modify another vendor\'s product');
+      }
+
+      await this.productRepo.addAttributeToProduct(productId, attributeValueId);
+      
+      const updatedProduct = await this.productRepo.findProductById(
+        productId,
+        true, // includeCategory
+        true, // includeAttributes
+        false // includeChildren
+      );
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(updatedProduct));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error adding attribute to product: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to add attribute to product');
+    }
+  }
+
+  async removeAttributeFromProduct(vendorId: string, productId: string, attributeValueId: string): Promise<ProductResponseDto> {
+    try {
+      const product = await this.productRepo.findProductById(productId);
+      if (!product) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
+      }
+
+      if (product.vendor_id !== vendorId) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot modify another vendor\'s product');
+      }
+
+      const success = await this.productRepo.removeAttributeFromProduct(productId, attributeValueId);
+      if (!success) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to remove attribute from product');
+      }
+      
+      const updatedProduct = await this.productRepo.findProductById(
+        productId,
+        true, // includeCategory
+        true, // includeAttributes
+        false // includeChildren
+      );
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(updatedProduct));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error removing attribute from product: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to remove attribute from product');
+    }
+  }
+
+  async searchProducts(query: string, options: {
+    page?: number;
+    limit?: number;
+    categoryId?: string;
+    vendorId?: string;
+  }): Promise<ProductListResponseDto> {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        categoryId,
+        vendorId
+      } = options;      const skip = (page - 1) * limit;
+
+      const result = await this.productRepo.searchProducts(
+        query,
+        page,
+        limit,
+        {
+          categoryId,
+          vendorId
+        }
+      );
+
+      if (!result) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to search products');
+      }
+
+      const transformedProducts = result.products.map(product => 
+        this.transformProductResponse(product)
+      );
+
+      return plainToClass(ProductListResponseDto, {
+        products: transformedProducts,
+        total: result.total,
+        page,
+        limit,
+        totalPages: Math.ceil(result.total / limit)
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error searching products: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to search products');
+    }
+  }
+
+  private transformProductResponse(product: any): any {
+    const transformed = {
+      id: product.id,
+      title: product.title,
+      description: product.description,
+      slug: product.slug,
+      sku: product.sku,
+      price: product.price,
+      images: product.images,
+      product_type: product.product_type,
+      parent_id: product.parent_id,
+      brand: product.brand,
+      season: product.season,
+      weight: product.weight,
+      is_active: product.is_active,
+      archived: product.archived,
+      created_at: product.created_at,
+      updated_at: product.updated_at
+    };
+
+    if (product.category) {
+      transformed['category'] = {
+        id: product.category.id,
+        name: product.category.name,
+        slug: product.category.slug
+      };
+    }
+
+    if (product.Inventory) {
+      transformed['inventory'] = {
+        quantity: product.Inventory.quantity,
+        low_stock_threshold: product.Inventory.low_stock_threshold,
+        reserved_quantity: product.Inventory.reserved_quantity
+      };
+    }
+
+    if (product.attributeValues) {
+      transformed['attributes'] = product.attributeValues.map((av: any) => ({
+        id: av.attributeValue.attribute.id,
+        name: av.attributeValue.attribute.name,
+        value: av.attributeValue.value,
+        display_value: av.attributeValue.display_value
+      }));
+    }
+
+    if (product.children) {
+      transformed['children'] = product.children.map((child: any) => this.transformProductResponse(child));
+    }
+
+    return transformed;
   }
 }

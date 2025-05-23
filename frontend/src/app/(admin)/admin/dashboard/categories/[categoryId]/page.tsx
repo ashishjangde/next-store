@@ -1,17 +1,18 @@
-'use client';
-
 import { Suspense } from 'react';
 import { LoadingPage } from "@/components/common/loading";
-import { CategoryDetailPage } from '@/components/admin/categories/category-detail-page';
-import { useParams } from 'next/navigation';
+import { CategoryDetailPage } from '@/app/(admin)/admin/dashboard/categories/[categoryId]/_components/category-detail-page';
 
 
-export default function CategoryDetailPageWrapper() {
-  // This is now just a wrapper component that renders the client component
-    const {categoryId} = useParams<{
-    categoryId: string;
-    }>();
- 
+export default async function CategoryDetailPageWrapper(
+  {
+  params
+  }: {
+    params: Promise<{ categoryId: string }>;
+  }
+) {
+
+  const { categoryId } = await params;
+
   return (
 
       <Suspense fallback={<LoadingPage />}>

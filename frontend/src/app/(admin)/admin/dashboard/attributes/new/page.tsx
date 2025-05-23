@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { CreateAttributeForm } from "@/components/admin/attributes/create-attribute-form";
+import { CreateAttributeForm } from "@/app/(admin)/admin/dashboard/attributes/new/_components/create-attribute-form";
 
 export const metadata: Metadata = {
   title: "Create New Attribute | Admin Dashboard",

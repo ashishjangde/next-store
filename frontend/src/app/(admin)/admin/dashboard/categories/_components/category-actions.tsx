@@ -4,7 +4,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Eye } from "lucide-react";
 import Link from "next/link";
-import { EditCategoryModal } from "./edit-category-modal";
+import { EditCategoryModal } from "../[categoryId]/_components/edit-category-modal";
 import { CategoryDeleteDialog } from "./category-delete-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 

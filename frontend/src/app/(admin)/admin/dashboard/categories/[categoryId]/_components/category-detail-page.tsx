@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CategoryActions } from "@/api-actions/categories-actions";
 import { LoadingPage } from "@/components/common/loading";
-import { CategoryDetailClient } from "./category-detail-client";
+import { CategoryDetailClient } from "../../_components/category-detail-client";
 
 interface CategoryDetailPageProps {
   categoryId: string;

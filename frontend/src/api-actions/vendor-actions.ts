@@ -70,7 +70,6 @@ export const VendorActions = {
   getVendorProfile: async (
     cookies?: string
   ): Promise<ApiResponse<IVendor>> => {
-    console.log('calling getVendorProfile');
     const response = await axiosInstance.get<ApiResponse<IVendor>>(
       "/vendor/profile",
       {

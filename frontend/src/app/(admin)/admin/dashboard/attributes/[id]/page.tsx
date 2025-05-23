@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { AttributeActions } from "@/api-actions/attributes-actions";
 import { notFound } from "next/navigation";
-import { AttributeDetailClient } from "@/components/admin/attributes/attribute-detail-client";
+import { AttributeDetailClient } from "@/app/(admin)/admin/dashboard/attributes/[id]/_components/attribute-detail-client";
 
 export const metadata: Metadata = {
   title: "Attribute Details | Admin Dashboard",

@@ -12,6 +12,7 @@ import { ProductModule } from './modules/product/product.module';
 import { CategoryModule } from './modules/category/category.module';
 import { VendorModule } from './modules/vendor/vendor.module';
 import { AttributeModule } from './modules/attribute/attribute.module';
+import { GeneralModule } from './modules/general/general.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { AttributeModule } from './modules/attribute/attribute.module';
     WhishlistModule,
     AddressModule,
     VendorModule,
+    GeneralModule,
   ],
   controllers: [],
   providers: [],

@@ -67,30 +67,25 @@ export class ProductController {
     status: HttpStatus.FORBIDDEN,
     description: 'Category level must be 2 or parent product type mismatch',
     schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Invalid category or parent'),
-  })
-  async createProduct(
+  })  async createProduct(
     @Body() createProductDto: ProductCreateDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: Users,
   ) {
     try {
-      // Get vendor information using user ID - following original pattern
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
-      // Use vendor.id if exists, otherwise user.id (for admin users)
-      const vendorId = vendor?.id || user.id;
-      
-      // Admin users can create products for any vendor, regular vendors only for themselves
-      if (createProductDto.vendor_id && createProductDto.vendor_id !== vendorId && !user.roles.includes(Roles.ADMIN)) {
+      if (!vendor) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'User does not have a vendor account');
+      }
+      let vendorId = vendor.id;
+      if (createProductDto.vendor_id && user.roles.includes(Roles.ADMIN)) {
+        vendorId = createProductDto.vendor_id;
+      } else if (createProductDto.vendor_id && createProductDto.vendor_id !== vendor.id) {
         throw new ApiError(HttpStatus.FORBIDDEN, 'Unauthorized to create product for this vendor');
       }
 
-      // If admin specifies a different vendor_id, use that instead
-      const finalVendorId = (createProductDto.vendor_id && user.roles.includes(Roles.ADMIN)) 
-        ? createProductDto.vendor_id 
-        : vendorId;
-
-      const product = await this.productService.createProduct(finalVendorId, createProductDto, images);
+      const product = await this.productService.createProduct(vendorId, createProductDto, images);
       return new ApiResponseClass(product);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -210,19 +205,31 @@ export class ProductController {
     status: HttpStatus.FORBIDDEN,
     description: 'Not authorized to update this product',
     schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Unauthorized'),
-  })
-  async updateProduct(
+  })  async updateProduct(
     @Param('id') id: string,
     @Body() updateProductDto: ProductUpdateDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: Users,
   ) {
     try {
-      // Get vendor information using user ID - following original pattern
+      // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
-      // Use vendor.id if exists, otherwise user.id (for admin users)
-      const vendorId = vendor?.id || user.id;
+      // For regular vendors, they must have a vendor account
+      if (!vendor && !user.roles.includes(Roles.ADMIN)) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'User does not have a vendor account');
+      }
+
+      // If user is admin, use their vendor account or allow null
+      // If user is vendor, they must have a vendor account
+      let vendorId: string;
+      if (user.roles.includes(Roles.ADMIN)) {
+        // For admins, if they have a vendor account, use it; otherwise handle at service level
+        vendorId = vendor?.id || 'admin';
+      } else {
+        // For vendors, vendor must exist
+        vendorId = vendor!.id;
+      }
 
       const product = await this.productService.updateProduct(vendorId, id, updateProductDto, images);
 
@@ -257,14 +264,26 @@ export class ProductController {
     status: HttpStatus.FORBIDDEN,
     description: 'Not authorized to delete this product',
     schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Unauthorized'),
-  })
-  async deleteProduct(@Param('id') id: string, @GetUser() user: Users) {
+  })  async deleteProduct(@Param('id') id: string, @GetUser() user: Users) {
     try {
-      // Get vendor information using user ID - following original pattern
+      // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
-      // Use vendor.id if exists, otherwise user.id (for admin users)
-      const vendorId = vendor?.id || user.id;
+      // For regular vendors, they must have a vendor account
+      if (!vendor && !user.roles.includes(Roles.ADMIN)) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'User does not have a vendor account');
+      }
+
+      // If user is admin, use their vendor account or allow special handling
+      // If user is vendor, they must have a vendor account
+      let vendorId: string;
+      if (user.roles.includes(Roles.ADMIN)) {
+        // For admins, if they have a vendor account, use it; otherwise use admin identifier
+        vendorId = vendor?.id || 'admin';
+      } else {
+        // For vendors, vendor must exist
+        vendorId = vendor!.id;
+      }
 
       await this.productService.deleteProduct(vendorId, id);
 
@@ -277,8 +296,7 @@ export class ProductController {
     }
   }
 
-  // Attribute management routes
-  @Post(':id/attributes')
+  // Attribute management routes  @Post(':id/attributes')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Role(Roles.VENDOR, Roles.ADMIN)
   @ApiBearerAuth()
@@ -293,11 +311,24 @@ export class ProductController {
     @GetUser() user: Users,
   ) {
     try {
-      // Get vendor information using user ID - following original pattern
+      // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
-      // Use vendor.id if exists, otherwise user.id (for admin users)
-      const vendorId = vendor?.id || user.id;
+      // For regular vendors, they must have a vendor account
+      if (!vendor && !user.roles.includes(Roles.ADMIN)) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'User does not have a vendor account');
+      }
+
+      // If user is admin, use their vendor account or allow special handling
+      // If user is vendor, they must have a vendor account
+      let vendorId: string;
+      if (user.roles.includes(Roles.ADMIN)) {
+        // For admins, if they have a vendor account, use it; otherwise use admin identifier
+        vendorId = vendor?.id || 'admin';
+      } else {
+        // For vendors, vendor must exist
+        vendorId = vendor!.id;
+      }
 
       const result = await this.productService.addAttributeToProduct(vendorId, productId, body.attributeValueId);
 
@@ -326,11 +357,24 @@ export class ProductController {
     @GetUser() user: Users,
   ) {
     try {
-      // Get vendor information using user ID - following original pattern
+      // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
-      // Use vendor.id if exists, otherwise user.id (for admin users)
-      const vendorId = vendor?.id || user.id;
+      // For regular vendors, they must have a vendor account
+      if (!vendor && !user.roles.includes(Roles.ADMIN)) {
+        throw new ApiError(HttpStatus.FORBIDDEN, 'User does not have a vendor account');
+      }
+
+      // If user is admin, use their vendor account or allow special handling
+      // If user is vendor, they must have a vendor account
+      let vendorId: string;
+      if (user.roles.includes(Roles.ADMIN)) {
+        // For admins, if they have a vendor account, use it; otherwise use admin identifier
+        vendorId = vendor?.id || 'admin';
+      } else {
+        // For vendors, vendor must exist
+        vendorId = vendor!.id;
+      }
 
       const result = await this.productService.removeAttributeFromProduct(vendorId, productId, attributeValueId);
 

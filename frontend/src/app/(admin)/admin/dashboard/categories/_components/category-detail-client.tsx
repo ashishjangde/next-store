@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { LoadingPage } from "@/components/common/loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryDetailsTab } from "./category-details-tab";
-import { CategoryAttributesTab } from "./category-attributes-tab";
+import { CategoryAttributeIndex } from "../[categoryId]/_components/category-attribute";
 import { CategoryChildrenTab } from "./category-children-tab";
 import { ArrowLeft, Edit, Trash2, Plus } from "lucide-react";
-import { EditCategoryModal } from "./edit-category-modal";
+import { EditCategoryModal } from "../[categoryId]/_components/edit-category-modal";
 import { Badge } from "@/components/ui/badge";
 import { CreateCategoryModal } from "./create-category-modal";
 import { CategoryDeleteDialog } from "./category-delete-dialog";
@@ -154,7 +154,7 @@ export const CategoryDetailClient = ({
           
           {showAttributesTab && (
             <TabsContent value="attributes" className="space-y-4">
-              <CategoryAttributesTab 
+              <CategoryAttributeIndex 
                 category={category} 
                 onUpdate={() => queryClient.invalidateQueries({ 
                   queryKey: ["category", category.id] 

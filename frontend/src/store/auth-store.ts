@@ -13,7 +13,7 @@ interface AuthStore {
 }
 
 export const useAuthStore = create<AuthStore>()(
-    persist(
+    // persist(
         (set, get) => ({
             user: null,
             isAuthenticated: false,
@@ -25,8 +25,8 @@ export const useAuthStore = create<AuthStore>()(
                 return roles.some(role => user.roles.includes(role));
             },
         }),
-        {
-            name: 'auth-storage',
-        }
-    )
+    //     {
+    //         name: 'auth-storage',
+    //     }
+    // )
 );

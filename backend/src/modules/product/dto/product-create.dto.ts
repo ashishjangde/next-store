@@ -1,79 +1,94 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, ValidateNested, IsUUID, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ProductType } from '@prisma/client';
 
 export class ProductCreateDto {
-  @ApiProperty({ description: 'The title of the product' })
+  @ApiProperty({ example: 'Mens Cotton T-Shirt' })
   @IsString()
   title: string;
 
-  @ApiProperty({ description: 'The description of the product' })
+  @ApiProperty({ example: 'Comfortable cotton t-shirt for everyday wear' })
   @IsString()
   description: string;
 
-  @ApiPropertyOptional({ description: 'The Stock Keeping Unit code' })
+  @ApiProperty({ example: 'mens-cotton-t-shirt' })
   @IsString()
+  slug: string;
+
+  @ApiPropertyOptional({ example: 'TCT001' })
   @IsOptional()
+  @IsString()
   sku?: string;
 
-  @ApiProperty({ description: 'The price of the product' })
+  @ApiProperty({ example: 29.99 })
   @IsNumber()
-  @Min(0)
+  @Type(() => Number)
   price: number;
 
-  @ApiPropertyOptional({ description: 'The brand of the product' })
+  @ApiProperty({ example: 'vendor-uuid' })
   @IsString()
+  @IsUUID()
+  vendor_id: string;
+
+  @ApiPropertyOptional({ example: ['image1.jpg', 'image2.jpg'] })
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
+
+  @ApiPropertyOptional({ enum: ProductType, example: ProductType.PARENT })
+  @IsOptional()
+  @IsEnum(ProductType)
+  product_type?: ProductType;
+
+  @ApiPropertyOptional({ example: 'parent-product-uuid' })
+  @IsOptional()
+  @IsString()
+  @IsUUID()
+  parent_id?: string;
+
+  @ApiPropertyOptional({ example: 'Nike' })
+  @IsOptional()
+  @IsString()
   brand?: string;
 
-  @ApiPropertyOptional({ description: 'The intended gender for the product', enum: ['Men\'s', 'Women\'s', 'Unisex', 'Kids'] })
-  @IsString()
+  @ApiPropertyOptional({ example: 'Summer' })
   @IsOptional()
-  gender?: string;
-
-  @ApiPropertyOptional({ description: 'The season the product is suitable for', enum: ['Summer', 'Winter', 'Monsoon', 'All Season'] })
   @IsString()
-  @IsOptional()
   season?: string;
 
-  @ApiPropertyOptional({ description: 'The weight of the product in grams' })
-  @IsNumber()
+  @ApiPropertyOptional({ example: 250.5 })
   @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
   weight?: number;
 
-  @ApiPropertyOptional({ description: 'The primary color name (e.g., "Navy Blue")' })
-  @IsString()
+  @ApiPropertyOptional({ example: true })
   @IsOptional()
-  color_name?: string;
-
-  @ApiPropertyOptional({ description: 'The color family for filtering (e.g., "Blue")' })
-  @IsString()
-  @IsOptional()
-  color_family?: string;
-
-  @ApiPropertyOptional({ description: 'Whether the product is active' })
   @IsBoolean()
-  @IsOptional()
   is_active?: boolean;
-
-  @ApiProperty({ description: 'The ID of the category this product belongs to' })
+  @ApiPropertyOptional({ example: 'category-uuid' })
+  @IsOptional()
+  @IsString()
   @IsUUID()
-  category_id: string;
+  category_id?: string;
 
-  @ApiPropertyOptional({ description: 'Array of attribute value IDs to assign to this product', type: [String] })
-  @IsArray()
-  @IsUUID(undefined, { each: true })
+  @ApiPropertyOptional({ example: 100, description: 'Initial inventory quantity' })
   @IsOptional()
-  attribute_value_ids?: string[];
-
-  @ApiProperty({ description: 'The initial inventory quantity for this product' })
   @IsNumber()
-  @Min(0)
-  quantity: number;
+  @Type(() => Number)
+  initial_quantity?: number;
 
-  @ApiPropertyOptional({ description: 'The low stock threshold for this product' })
-  @IsNumber()
+  @ApiPropertyOptional({ example: 10, description: 'Low stock threshold for alerts' })
   @IsOptional()
-  @Min(1)
+  @IsNumber()
+  @Type(() => Number)
   low_stock_threshold?: number;
+
+  @ApiPropertyOptional({ example: ['attr-value-1', 'attr-value-2'], description: 'Array of attribute value IDs' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  attribute_value_ids?: string[];
 }

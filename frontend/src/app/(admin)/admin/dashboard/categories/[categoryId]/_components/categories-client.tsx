@@ -6,14 +6,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
-import { CategoryColumns } from "./columns";
+import { CategoryColumns } from "../../_components/columns";
 import { PageHeader } from "@/components/common/page-header";
-import { CategoryFilters } from "./category-filters";
-import { CreateCategoryModal } from "./create-category-modal";
+import { CategoryFilters } from "../../_components/category-filters";
+import { CreateCategoryModal } from "../../_components/create-category-modal";
 import { LoadingPage } from "@/components/common/loading";
 
 export const CategoriesClient = () => {
-  // Local state for filtering instead of URL params
   const [search, setSearch] = useState("");
   const [parentId, setParentId] = useState("");
   const [includeInactive, setIncludeInactive] = useState(false);

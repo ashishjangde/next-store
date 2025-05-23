@@ -67,7 +67,10 @@ enum PaymentMethod {
   OTHER
 }
 
-
+enum ProductType {
+  PARENT
+  VARIANT
+}
 
 //Country of Origin is set to India by default
 
@@ -171,6 +174,7 @@ model Users {
   Reviews                     ProductReview[]
   Vendor                      Vendor?
   Payment                     Payment[]
+  ProductHistory              ProductHistory[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -227,80 +231,73 @@ model Product {
   id              String      @id @default(uuid())
   title           String
   description     String
+  slug            String      @unique // For SEO-friendly URLs
   sku             String?     // Stock Keeping Unit
   price           Float
   vendor_id       String
   images          String[]    // Array of image URLs
   
+  // Product type and parent relationship
+  product_type    ProductType @default(PARENT)
+  parent_id       String?
+  parent          Product?    @relation("ProductHierarchy", fields: [parent_id], references: [id], onDelete: Cascade)
+  children        Product[]   @relation("ProductHierarchy")
+  
   // Apparel specific fields
   brand           String?
-  gender          String?     // Men's, Women's, Unisex, Kids
   season          String?     // Summer, Winter, Monsoon, All Season
   weight          Float?      // in grams
-  color_name      String?     // Primary color name (e.g., "Navy Blue")
-  color_family    String?     // Color family for filtering (e.g., "Blue")
   
   // Archiving and soft deletion
   is_active       Boolean     @default(true)
   archived        Boolean     @default(false)
   archived_at     DateTime?
   
-  // Category relation replacing enum
+  // Category relation
   category_id     String?
   category        Category?   @relation(fields: [category_id], references: [id])
-    // Product attributes
+  
+  // Product attributes
   attributeValues ProductAttributeValue[]
   
-  // Other relations
+  // Timestamps
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+  
+  // Relations
   Vendor          Vendor      @relation(fields: [vendor_id], references: [id], onDelete: Cascade)
   OrderItems      OrderItem[]
   CartItems       CartItem[]
   Wishlists       Wishlist[]
-  Inventory       Inventory?  // A product has only base inventory now
-  VariationInventory VariationInventory[] // New relation for variation-specific inventory
-  Variations      ProductVariation[]
+  Inventory       Inventory?
   Reviews         ProductReview[]
   Users           Users[]     @relation("VendorProducts")
+  History         ProductHistory[]
 }
 
-model ProductVariation {
-  id          String    @id @default(uuid())
-  product_id  String
-  size        String    
-  color       String
-  sku         String?   
-  price_mod   Float?    
-  images      String[]  
-  Product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  Inventory   VariationInventory? // Each variation has its own inventory
-  
-  @@unique([product_id, size, color])
-}
-
-
-// Base inventory for product (main stock)
+// Simplified inventory model - one per product
 model Inventory {
-  id           String    @id @default(uuid())
-  product_id   String    @unique // One inventory per product
-  quantity     Int
-  low_stock_threshold Int @default(10)
-  last_updated DateTime  @default(now())
+  id                  String    @id @default(uuid())
+  product_id          String    @unique
+  quantity            Int
+  low_stock_threshold Int       @default(10)
+  reserved_quantity   Int       @default(0)
+  last_updated        DateTime  @default(now())
 
-  Product      Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  Product             Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
 }
 
-// Granular inventory tracking per variation
-model VariationInventory {
-  id                String    @id @default(uuid())
-  variation_id      String    @unique // One inventory per variation
-  quantity          Int
-  low_stock_threshold Int     @default(5)
-  reserved_quantity Int       @default(0) // For items in checkout process
-  last_updated      DateTime  @default(now())
+// New model for tracking user product visit history
+model ProductHistory {
+  id          String    @id @default(uuid())
+  user_id     String
+  product_id  String
+  visited_at  DateTime  @default(now())
   
-  Variation         ProductVariation @relation(fields: [variation_id], references: [id], onDelete: Cascade)
-
-  Product Product[]
+  User        Users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, product_id]) // Prevent duplicate entries, update visited_at instead
 }
 
 model Order {
@@ -336,22 +333,6 @@ model OrderItem {
   Product            Product  @relation(fields: [product_id], references: [id])
 }
 
-// New archive tables for long-term storage
-
-model ArchivedProduct {
-  id              String    @id @default(uuid())
-  original_id     String    @unique // The ID from the original Product table
-  data            Json      // All product data stored as JSON
-  archived_at     DateTime  @default(now())
-}
-
-model ArchivedOrder {
-  id              String    @id @default(uuid())
-  original_id     String    @unique // The ID from the original Order table
-  user_id         String    // Keeping direct reference to user
-  data            Json      // All order data including items as JSON
-  archived_at     DateTime  @default(now())
-}
 
 model CartItem {
   id         String   @id @default(uuid())
