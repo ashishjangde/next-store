@@ -5,11 +5,18 @@ import ConfigService from '../../config/config.service';
 @Injectable()
 export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
   private client: Client;
-  private readonly logger = new Logger(ElasticsearchService.name);
-
-  constructor(private readonly configService: ConfigService) {
+  private readonly logger = new Logger(ElasticsearchService.name);  constructor(private readonly configService: ConfigService) {
     this.client = new Client({
       node: this.configService.get('ELASTICSEARCH_NODE'),
+      // Configure the client to be compatible with Elasticsearch 8.x
+      tls: {
+        rejectUnauthorized: false
+      },
+      auth: {
+        username: this.configService.get('ELASTICSEARCH_USERNAME') || '',
+        password: this.configService.get('ELASTICSEARCH_PASSWORD') || ''
+      }
+      // No additional headers needed when using appropriate client version
     });
   }
 
@@ -29,39 +36,51 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
 
   getClient(): Client {
     return this.client;
-  }
-
-  async createIndex(index: string, mapping?: any): Promise<void> {
+  }  async createIndex(index: string, mapping?: any): Promise<void> {
     const indexName = this.getIndexName(index);
     
-    const exists = await this.client.indices.exists({ index: indexName });
-    if (!exists) {
-      await this.client.indices.create({
-        index: indexName,
-        body: mapping ? { mappings: mapping } : undefined,
-      });
-      this.logger.log(`Index '${indexName}' created successfully`);
+    try {
+      const exists = await this.client.indices.exists({ index: indexName });
+      if (!exists) {
+        await this.client.indices.create({
+          index: indexName,
+          body: mapping ? { mappings: mapping } : undefined,
+        });
+        this.logger.log(`Index '${indexName}' created successfully`);
+      }
+    } catch (error) {
+      this.logger.error(`Error creating index ${indexName}: ${error.message}`, error);
+      throw error;
     }
-  }
-
-  async indexDocument(index: string, id: string, document: any): Promise<void> {
+  }async indexDocument(index: string, id: string, document: any): Promise<void> {
     const indexName = this.getIndexName(index);
     
-    await this.client.index({
-      index: indexName,
-      id,
-      body: document,
-    });
-  }
-
-  async updateDocument(index: string, id: string, document: any): Promise<void> {
+    try {
+      // Using Elasticsearch 8.x compatible syntax
+      await this.client.index({
+        index: indexName,
+        id,
+        body: document,
+      });
+      
+      this.logger.log(`Document indexed successfully: ${indexName}/${id}`);
+    } catch (error) {
+      this.logger.error(`Error indexing document: ${error.message}`, error);
+      throw error;
+    }
+  }  async updateDocument(index: string, id: string, document: any): Promise<void> {
     const indexName = this.getIndexName(index);
     
-    await this.client.update({
-      index: indexName,
-      id,
-      body: { doc: document },
-    });
+    try {
+      await this.client.update({
+        index: indexName,
+        id,
+        body: { doc: document },
+      });
+    } catch (error) {
+      this.logger.error(`Error updating document: ${error.message}`, error);
+      throw error;
+    }
   }
 
   async deleteDocument(index: string, id: string): Promise<void> {
@@ -71,26 +90,34 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
       index: indexName,
       id,
     });
-  }
-
-  async search(index: string, query: any): Promise<any> {
+  }  async search(index: string, query: any): Promise<any> {
     const indexName = this.getIndexName(index);
     
-    return await this.client.search({
-      index: indexName,
-      body: query,
-    });
-  }
-
-  async bulkIndex(index: string, documents: Array<{ id: string; doc: any }>): Promise<void> {
+    try {
+      return await this.client.search({
+        index: indexName,
+        body: query,
+      });
+    } catch (error) {
+      this.logger.error(`Error searching documents: ${error.message}`, error);
+      throw error;
+    }
+  }  async bulkIndex(index: string, documents: Array<{ id: string; doc: any }>): Promise<void> {
     const indexName = this.getIndexName(index);
     
-    const body = documents.flatMap(({ id, doc }) => [
+    const operations = documents.flatMap(({ id, doc }) => [
       { index: { _index: indexName, _id: id } },
       doc,
     ]);
 
-    await this.client.bulk({ body });
+    try {
+      await this.client.bulk({ 
+        body: operations,
+      });
+    } catch (error) {
+      this.logger.error(`Error bulk indexing documents: ${error.message}`, error);
+      throw error;
+    }
   }
 
   private getIndexName(index: string): string {

@@ -50,17 +50,26 @@ async function bootstrap() {
 
     // global exception filter
     app.useGlobalFilters(new GlobalExceptionFilter());
-
-
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
         transform: true,
         forbidNonWhitelisted: true,
         exceptionFactory: errors => {
+          // Build a detailed error object with field names as keys
           const messages = errors.reduce(
             (acc, err) => {
-              acc[err.property] = Object.values(err.constraints || {}).join(', ');
+              // For nested validation errors
+              if (err.children && err.children.length > 0) {
+                err.children.forEach(child => {
+                  Object.entries(child.constraints || {}).forEach(([key, value]) => {
+                    acc[`${err.property}.${child.property}`] = value;
+                  });
+                });
+              } else {
+                // For direct property errors
+                acc[err.property] = Object.values(err.constraints || {}).join(', ');
+              }
               return acc;
             },
             {} as Record<string, string>,

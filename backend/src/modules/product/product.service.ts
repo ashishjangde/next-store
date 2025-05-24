@@ -27,11 +27,7 @@ export class ProductService {
     createDto: ProductCreateDto,
     files?: Express.Multer.File[]
   ): Promise<ProductResponseDto> {
-    try {
-      // Validate category level
-      if (!createDto.category_id) {
-        throw new ApiError(HttpStatus.BAD_REQUEST, 'Category ID is required');
-      }
+    try {      // Validate category exists
       const category = await this.categoryRepo.findCategoryById(createDto.category_id);
       if (!category) {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Category not found');
@@ -40,6 +36,9 @@ export class ProductService {
       if (category.level !== 2) {
         throw new ApiError(HttpStatus.BAD_REQUEST, 'Products can only be added to level 2 categories');
       }
+
+      // Automatically determine product_type based on parent_id
+      const productType = createDto.parent_id ? ProductType.VARIANT : ProductType.PARENT;
 
       // Validate parent product if parent_id is provided
       if (createDto.parent_id) {
@@ -55,10 +54,8 @@ export class ProductService {
         if (parentProduct.vendor_id !== vendorId) {
           throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot create variant for another vendor\'s product');
         }
-      }
-
-      // Generate slug
-      const slug = slugify(createDto.title);
+      }      // Generate slug if not provided
+      const slug = createDto.slug || slugify(createDto.title);
 
       // Handle file uploads
       let imageUrls: string[] = [];
@@ -85,9 +82,7 @@ export class ProductService {
         } catch (error) {
           throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload product images');
         }
-      }
-
-      // Prepare product data
+      }      // Prepare product data
       const productData: Prisma.ProductCreateInput = {
         title: createDto.title,
         description: createDto.description,
@@ -97,9 +92,9 @@ export class ProductService {
         brand: createDto.brand,
         season: createDto.season,
         weight: createDto.weight,
-        product_type: createDto.product_type,
+        product_type: productType, // Use automatically determined product type based on parent_id
         images: imageUrls,
-        Vendor: { connect: { id: vendorId } },
+        Vendor: { connect: { id: vendorId } }, // Always use the vendor ID from the authenticated user
         category: { connect: { id: createDto.category_id } },
         ...(createDto.parent_id && {
           parent: { connect: { id: createDto.parent_id } }
@@ -160,7 +155,10 @@ export class ProductService {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
       }
 
-      return plainToClass(ProductResponseDto, this.transformProductResponse(product));
+      // Enhanced product response with parent and siblings information
+      const enhancedProduct = await this.enhanceProductWithRelations(product);
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(enhancedProduct));
     } catch (error) {
       if (error instanceof ApiError) throw error;
       this.logger.error(`Error getting product by ID: ${error.message}`, error.stack);
@@ -175,6 +173,7 @@ export class ProductService {
     includeChildren = false
   ): Promise<ProductResponseDto> {
     try {
+      // Use the enhanced findProductBySlug method which now leverages Elasticsearch and Redis
       const product = await this.productRepo.findProductBySlug(
         slug,
         includeCategory,
@@ -186,7 +185,10 @@ export class ProductService {
         throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found');
       }
 
-      return plainToClass(ProductResponseDto, this.transformProductResponse(product));
+      // Enhanced product response with parent and siblings information
+      const enhancedProduct = await this.enhanceProductWithRelations(product);
+
+      return plainToClass(ProductResponseDto, this.transformProductResponse(enhancedProduct));
     } catch (error) {
       if (error instanceof ApiError) throw error;
       this.logger.error(`Error getting product by slug: ${error.message}`, error.stack);
@@ -515,6 +517,108 @@ export class ProductService {
     }
   }
 
+  /**
+   * Get all parent products for a specific vendor with pagination and filters
+   */
+  async getVendorParentProducts(
+    vendorId: string,
+    options: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      categoryId?: string;
+      includeCategory?: boolean;
+      includeAttributes?: boolean;
+      includeChildren?: boolean;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    }
+  ): Promise<ProductListResponseDto> {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        categoryId,
+        includeCategory = false,
+        includeAttributes = false,
+        includeChildren = false,
+        sortBy = 'created_at',
+        sortOrder = 'desc'
+      } = options;
+      
+      const skip = (page - 1) * limit;
+      
+      const result = await this.productRepo.findVendorParentProducts({
+        vendorId,
+        skip,
+        take: limit,
+        search,
+        categoryId,
+        includeCategory,
+        includeAttributes,
+        includeChildren,
+        sortBy,
+        sortOrder
+      });
+      
+      if (!result) {
+        throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve vendor products');
+      }
+      
+      const transformedProducts = result.products.map(product => 
+        this.transformProductResponse(product)
+      );
+      
+      return plainToClass(ProductListResponseDto, {
+        products: transformedProducts,
+        total: result.total,
+        page,
+        limit,
+        totalPages: Math.ceil(result.total / limit)
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error getting vendor parent products: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve vendor products');
+    }
+  }
+  
+  /**
+   * Get a specific product by ID for a vendor
+   * Ensures that the product belongs to the specified vendor
+   */
+  async getVendorProductById(
+    vendorId: string,
+    productId: string,
+    includeCategory = false,
+    includeAttributes = false,
+    includeChildren = false
+  ): Promise<ProductResponseDto> {
+    try {
+      const product = await this.productRepo.findVendorProductById(
+        vendorId,
+        productId,
+        includeCategory,
+        includeAttributes,
+        includeChildren
+      );
+      
+      if (!product) {
+        throw new ApiError(HttpStatus.NOT_FOUND, 'Product not found or does not belong to this vendor');
+      }
+      
+      // Enhanced product response with parent and siblings information
+      const enhancedProduct = await this.enhanceProductWithRelations(product);
+      
+      return plainToClass(ProductResponseDto, this.transformProductResponse(enhancedProduct));
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      this.logger.error(`Error getting vendor product by ID: ${error.message}`, error.stack);
+      throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve vendor product');
+    }
+  }
+
   private transformProductResponse(product: any): any {
     const transformed = {
       id: product.id,
@@ -564,6 +668,64 @@ export class ProductService {
       transformed['children'] = product.children.map((child: any) => this.transformProductResponse(child));
     }
 
+    // Include parent product information if available
+    if (product.parent) {
+      transformed['parent'] = this.transformProductResponse(product.parent);
+    }
+
+    // Include siblings information if available
+    if (product.siblings && Array.isArray(product.siblings)) {
+      transformed['siblings'] = product.siblings.map((sibling: any) => 
+        this.transformProductResponse(sibling)
+      );
+    }
+
     return transformed;
+  }
+
+  private async enhanceProductWithRelations(product: any): Promise<any> {
+    // Make a copy of the product to avoid modifying the original
+    const enhancedProduct = { ...product };
+
+    // If product is a variant, fetch its parent and other siblings
+    if (product.product_type === ProductType.VARIANT && product.parent_id) {
+      try {
+        // Fetch parent product with all its variants (siblings)
+        const parentProduct = await this.productRepo.findProductById(
+          product.parent_id,
+          true, // includeCategory
+          true, // includeAttributes
+          true  // includeChildren - this will include all siblings
+        );
+
+        if (parentProduct) {
+          // Add parent data to the enhanced product
+          enhancedProduct.parent = this.transformProductResponse(parentProduct);
+          
+          // Add siblings (excluding the current product)
+          if (parentProduct.children && Array.isArray(parentProduct.children)) {
+            enhancedProduct.siblings = parentProduct.children
+              .filter(sibling => sibling.id !== product.id) // Exclude current product
+              .map(sibling => this.transformProductResponse(sibling));
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Error fetching parent and siblings: ${error.message}`, error.stack);
+      }
+    } 
+    // If product is a parent, make sure children/variants are included
+    else if (product.product_type === ProductType.PARENT && !product.children) {
+      try {
+        // Fetch variants if they weren't already included
+        const variants = await this.productRepo.findVariantsByParentId(product.id);
+        if (variants && Array.isArray(variants) && variants.length > 0) {
+          enhancedProduct.children = variants;
+        }
+      } catch (error) {
+        this.logger.error(`Error fetching variants: ${error.message}`, error.stack);
+      }
+    }
+
+    return enhancedProduct;
   }
 }

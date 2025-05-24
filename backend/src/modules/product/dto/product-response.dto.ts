@@ -102,6 +102,14 @@ export class ProductResponseDto {
   @ApiPropertyOptional({ description: 'Child products (variants)', type: [ProductResponseDto] })
   @Type(() => ProductResponseDto)
   children?: ProductResponseDto[];
+
+  @ApiPropertyOptional({ description: 'Parent product (for variants)', type: ProductResponseDto })
+  @Type(() => ProductResponseDto)
+  parent?: ProductResponseDto;
+
+  @ApiPropertyOptional({ description: 'Sibling products (other variants of the same parent)', type: [ProductResponseDto] })
+  @Type(() => ProductResponseDto)
+  siblings?: ProductResponseDto[];
 }
 
 export { ProductListResponseDto } from './product-list-response.dto';

@@ -1,34 +1,45 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsPositive, Min, ArrayMinSize, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class InventoryUpdateDto {
-  @ApiProperty({ description: 'The quantity in stock' })
+  @ApiProperty({ description: 'Current stock quantity', example: 100 })
   @IsNumber()
-  @Min(0)
+  @Min(0, { message: 'Quantity cannot be negative' })
   quantity: number;
 
-  @ApiPropertyOptional({ description: 'The threshold for low stock alerts' })
-  @IsNumber()
+  @ApiPropertyOptional({ description: 'Low stock threshold', example: 10 })
   @IsOptional()
-  @Min(1)
+  @IsNumber()
+  @IsPositive({ message: 'Low stock threshold must be positive' })
   low_stock_threshold?: number;
+
+  @ApiPropertyOptional({ description: 'Reserved quantity (for pending orders)', example: 5 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0, { message: 'Reserved quantity cannot be negative' })
+  reserved_quantity?: number;
+}
+
+export class VariantInventoryItemDto {
+  @ApiProperty({ description: 'Variant product ID', example: '8f9dfe2e-a8c3-4ad7-b1f9-4e3a412e7890' })
+  @IsString()
+  variantId: string;
+
+  @ApiProperty({ description: 'Inventory update data' })
+  @ValidateNested()
+  @Type(() => InventoryUpdateDto)
+  inventory: InventoryUpdateDto;
 }
 
 export class VariationInventoryUpdateDto {
-  @ApiProperty({ description: 'The quantity in stock' })
-  @IsNumber()
-  @Min(0)
-  quantity: number;
-
-  @ApiPropertyOptional({ description: 'The threshold for low stock alerts' })
-  @IsNumber()
-  @IsOptional()
-  @Min(1)
-  low_stock_threshold?: number;
-
-  @ApiPropertyOptional({ description: 'The quantity currently reserved for orders' })
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  reserved_quantity?: number;
+  @ApiProperty({ 
+    description: 'Array of variant inventory updates',
+    type: [VariantInventoryItemDto],
+    minItems: 1
+  })
+  @ArrayMinSize(1, { message: 'At least one variant inventory must be provided' })
+  @ValidateNested({ each: true })
+  @Type(() => VariantInventoryItemDto)
+  variants: VariantInventoryItemDto[];
 }

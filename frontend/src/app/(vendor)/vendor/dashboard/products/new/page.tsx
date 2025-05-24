@@ -1,7 +1,7 @@
-import React from 'react'
+import { ProductCreatePage } from "../_components/product-create-page";
 
-export default function page() {
+export default function NewProductPage() {
   return (
-    <div>page</div>
-  )
+    <ProductCreatePage />
+  );
 }

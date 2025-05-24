@@ -6,6 +6,7 @@ export class ValidationException extends BadRequestException {
       statusCode: 400,
       message: 'Validation failed',
       errors: errors,
+      isValidationError: true, // Add a flag to identify validation errors
     };
     super(response);
   }

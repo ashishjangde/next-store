@@ -67,30 +67,19 @@ export class ProductController {
     status: HttpStatus.FORBIDDEN,
     description: 'Category level must be 2 or parent product type mismatch',
     schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Invalid category or parent'),
-  })
-  async createProduct(
+  })  async createProduct(
     @Body() createProductDto: ProductCreateDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: Users,
   ) {
     try {
-      // Get vendor information using user ID - following original pattern
+      // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
       // Use vendor.id if exists, otherwise user.id (for admin users)
       const vendorId = vendor?.id || user.id;
-      
-      // Admin users can create products for any vendor, regular vendors only for themselves
-      if (createProductDto.vendor_id && createProductDto.vendor_id !== vendorId && !user.roles.includes(Roles.ADMIN)) {
-        throw new ApiError(HttpStatus.FORBIDDEN, 'Unauthorized to create product for this vendor');
-      }
 
-      // If admin specifies a different vendor_id, use that instead
-      const finalVendorId = (createProductDto.vendor_id && user.roles.includes(Roles.ADMIN)) 
-        ? createProductDto.vendor_id 
-        : vendorId;
-
-      const product = await this.productService.createProduct(finalVendorId, createProductDto, images);
+      const product = await this.productService.createProduct(vendorId, createProductDto, images);
       return new ApiResponseClass(product);
     } catch (error) {
       if (error instanceof ApiError) {
@@ -210,15 +199,14 @@ export class ProductController {
     status: HttpStatus.FORBIDDEN,
     description: 'Not authorized to update this product',
     schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Unauthorized'),
-  })
-  async updateProduct(
+  })  async updateProduct(
     @Param('id') id: string,
     @Body() updateProductDto: ProductUpdateDto,
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: Users,
   ) {
     try {
-      // Get vendor information using user ID - following original pattern
+      // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
       // Use vendor.id if exists, otherwise user.id (for admin users)
@@ -335,6 +323,148 @@ export class ProductController {
       const result = await this.productService.removeAttributeFromProduct(vendorId, productId, attributeValueId);
 
       return new ApiResponseClass(result);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return new ApiResponseClass(null, error);
+      }
+      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
+    }
+  }
+
+  /**
+   * Routes for vendor parent products
+   */
+  @Get('vendor/parent')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(Roles.VENDOR, Roles.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get all parent products for the authenticated vendor',
+    description: 'Retrieve all parent products for the vendor with optional filters, search, and pagination',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search term' })
+  @ApiQuery({ name: 'category_id', required: false, type: String, description: 'Filter by category' })
+  @ApiQuery({ name: 'include_category', required: false, type: Boolean, description: 'Include category details' })
+  @ApiQuery({ name: 'include_attributes', required: false, type: Boolean, description: 'Include product attributes' })
+  @ApiQuery({ name: 'include_children', required: false, type: Boolean, description: 'Include child products/variants' })
+  @ApiQuery({ name: 'sort_by', required: false, type: String, description: 'Field to sort by (created_at, title, price)' })
+  @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'], description: 'Sort order' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Parent products retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User is not authenticated',
+    schema: ApiCustomErrorResponse(HttpStatus.UNAUTHORIZED, 'Unauthorized'),
+  })
+  async getVendorParentProducts(
+    @GetUser() user: Users,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search?: string,
+    @Query('category_id') categoryId?: string,
+    @Query('include_category') includeCategory: string = 'false',
+    @Query('include_attributes') includeAttributes: string = 'false',
+    @Query('include_children') includeChildren: string = 'false',
+    @Query('sort_by') sortBy: string = 'created_at',
+    @Query('sort_order') sortOrder: 'asc' | 'desc' = 'desc',
+  ) {
+    try {
+      // Get vendor information using user ID
+      const vendor = await this.vendorRepository.findVendorByUserId(user.id);
+      
+      // If admin but not a vendor, return error
+      if (user.roles.includes(Roles.ADMIN) && !vendor) {
+        return new ApiResponseClass(null, new ApiError(HttpStatus.FORBIDDEN, 'Admin users must have a vendor account to access vendor products'));
+      }
+      
+      // Use vendor.id if exists, otherwise user.id (for admin-vendors)
+      const vendorId = vendor?.id || user.id;
+      
+      const pageNum = parseInt(page, 10);
+      const limitNum = parseInt(limit, 10);
+      
+      const result = await this.productService.getVendorParentProducts(
+        vendorId,
+        {
+          page: pageNum,
+          limit: limitNum,
+          search,
+          categoryId,
+          includeCategory: includeCategory === 'true',
+          includeAttributes: includeAttributes === 'true',
+          includeChildren: includeChildren === 'true',
+          sortBy,
+          sortOrder
+        }
+      );
+      
+      return new ApiResponseClass(result);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        return new ApiResponseClass(null, error);
+      }
+      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
+    }
+  }
+  
+  @Get('vendor/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Role(Roles.VENDOR, Roles.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get a specific vendor product by ID',
+    description: 'Retrieve a product that belongs to the authenticated vendor',
+  })
+  @ApiParam({ name: 'id', description: 'Product ID' })
+  @ApiQuery({ name: 'include_category', required: false, type: Boolean, description: 'Include category details' })
+  @ApiQuery({ name: 'include_attributes', required: false, type: Boolean, description: 'Include product attributes' })
+  @ApiQuery({ name: 'include_children', required: false, type: Boolean, description: 'Include child products/variants' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Product retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Product not found or does not belong to this vendor',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Product not found or does not belong to this vendor'),
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'User is not authenticated',
+    schema: ApiCustomErrorResponse(HttpStatus.UNAUTHORIZED, 'Unauthorized'),
+  })
+  async getVendorProductById(
+    @GetUser() user: Users,
+    @Param('id') productId: string,
+    @Query('include_category') includeCategory: string = 'false',
+    @Query('include_attributes') includeAttributes: string = 'false',
+    @Query('include_children') includeChildren: string = 'false',
+  ) {
+    try {
+      // Get vendor information using user ID
+      const vendor = await this.vendorRepository.findVendorByUserId(user.id);
+      
+      // If admin but not a vendor, return error
+      if (user.roles.includes(Roles.ADMIN) && !vendor) {
+        return new ApiResponseClass(null, new ApiError(HttpStatus.FORBIDDEN, 'Admin users must have a vendor account to access vendor products'));
+      }
+      
+      // Use vendor.id if exists, otherwise user.id (for admin-vendors)
+      const vendorId = vendor?.id || user.id;
+      
+      const product = await this.productService.getVendorProductById(
+        vendorId,
+        productId,
+        includeCategory === 'true',
+        includeAttributes === 'true',
+        includeChildren === 'true'
+      );
+      
+      return new ApiResponseClass(product);
     } catch (error) {
       if (error instanceof ApiError) {
         return new ApiResponseClass(null, error);

@@ -1,88 +1,125 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Exclude, Expose, Type } from 'class-transformer';
 
-export class InventoryResponseDto {
-  @ApiProperty({ description: 'The unique identifier of the inventory record' })
+@Exclude()
+export class ProductBasicInfoDto {
+  @Expose()
+  @ApiProperty({ example: '1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p' })
   id: string;
 
-  @ApiProperty({ description: 'The ID of the product this inventory belongs to' })
-  product_id: string;
+  @Expose()
+  @ApiProperty({ example: 'Men\'s Cotton T-Shirt' })
+  title: string;
 
-  @ApiProperty({ description: 'The quantity in stock' })
-  quantity: number;
+  @Expose()
+  @ApiProperty({ example: 'mens-cotton-t-shirt' })
+  slug: string;
 
-  @ApiProperty({ description: 'The threshold for low stock alerts' })
-  low_stock_threshold: number;
+  @Expose()
+  @ApiPropertyOptional({ example: 'SKU12345' })
+  sku?: string;
 
-  @ApiProperty({ description: 'When this inventory record was last updated' })
-  last_updated: Date;
+  @Expose()
+  @ApiProperty({ example: 29.99 })
+  price: number;
+  
+  @Expose()
+  @ApiPropertyOptional({ example: ['https://example.com/image1.jpg'] })
+  images?: string[];
 }
 
-export class VariationInventoryResponseDto {
-  @ApiProperty({ description: 'The unique identifier of the inventory record' })
+@Exclude()
+export class InventoryResponseDto {
+  @Expose()
+  @ApiProperty({ example: '1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p' })
   id: string;
 
-  @ApiProperty({ description: 'The ID of the variation this inventory belongs to' })
-  variation_id: string;
+  @Expose()
+  @ApiProperty({ example: '2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q' })
+  product_id: string;
 
-  @ApiProperty({ description: 'The quantity in stock' })
+  @Expose()
+  @ApiProperty({ example: 100 })
   quantity: number;
 
-  @ApiProperty({ description: 'The threshold for low stock alerts' })
+  @Expose()
+  @ApiProperty({ example: 10 })
   low_stock_threshold: number;
 
-  @ApiProperty({ description: 'The quantity currently reserved for orders' })
+  @Expose()
+  @ApiProperty({ example: 5 })
   reserved_quantity: number;
 
-  @ApiProperty({ description: 'When this inventory record was last updated' })
+  @Expose()
+  @ApiProperty({ example: '2025-05-24T10:30:00.000Z' })
   last_updated: Date;
+
+  @Expose()
+  @ApiPropertyOptional()
+  @Type(() => ProductBasicInfoDto)
+  Product?: ProductBasicInfoDto;
 }
 
+@Exclude()
+export class VariationInventoryResponseDto {
+  @Expose()
+  @ApiProperty({ example: '1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p' })
+  parent_id: string;
+
+  @Expose()
+  @ApiProperty({ example: 'Men\'s Cotton T-Shirt - Parent' })
+  parent_title: string;
+
+  @Expose()
+  @ApiProperty({ type: [InventoryResponseDto] })
+  @Type(() => InventoryResponseDto)
+  variants: InventoryResponseDto[];
+
+  @Expose()
+  @ApiProperty({ example: 5 })
+  total_updated: number;
+}
+
+@Exclude()
 export class LowStockProductDto {
-  @ApiProperty({ description: 'Inventory details' })
+  @Expose()
+  @ApiProperty({ example: '1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p' })
   id: string;
-  
-  @ApiProperty({ description: 'Product ID' })
+
+  @Expose()
+  @ApiProperty({ example: '2b3c4d5e-6f7g-8h9i-0j1k-2l3m4n5o6p7q' })
   product_id: string;
-  
-  @ApiProperty({ description: 'Quantity in stock' })
+
+  @Expose()
+  @ApiProperty({ example: 5 })
   quantity: number;
-  
-  @ApiProperty({ description: 'Low stock threshold' })
+
+  @Expose()
+  @ApiProperty({ example: 10 })
   low_stock_threshold: number;
-  
-  @ApiProperty({ description: 'Product details' })
-  Product: {
-    id: string;
-    title: string;
-    sku?: string;
-    price: number;
-    images: string[];
-  };
+
+  @Expose()
+  @ApiProperty({ example: 2 })
+  reserved_quantity: number;
+
+  @Expose()
+  @ApiProperty()
+  @Type(() => ProductBasicInfoDto)
+  Product: ProductBasicInfoDto;
 }
 
+@Exclude()
 export class LowStockVariationDto {
-  @ApiProperty({ description: 'Inventory details' })
-  id: string;
-  
-  @ApiProperty({ description: 'Variation ID' })
-  variation_id: string;
-  
-  @ApiProperty({ description: 'Quantity in stock' })
-  quantity: number;
-  
-  @ApiProperty({ description: 'Low stock threshold' })
-  low_stock_threshold: number;
-  
-  @ApiProperty({ description: 'Variation details' })
-  Variation: {
-    id: string;
-    size: string;
-    color: string;
-    sku?: string;
-    Product: {
-      id: string;
-      title: string;
-      sku?: string;
-    }
-  };
+  @Expose()
+  @ApiProperty({ example: '1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p' })
+  parent_id: string;
+
+  @Expose()
+  @ApiProperty({ example: 'Men\'s Cotton T-Shirt - Parent' })
+  parent_title: string;
+
+  @Expose()
+  @ApiProperty({ type: [LowStockProductDto] })
+  @Type(() => LowStockProductDto)
+  variants: LowStockProductDto[];
 }

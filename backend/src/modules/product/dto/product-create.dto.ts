@@ -3,33 +3,26 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductType } from '@prisma/client';
 
-export class ProductCreateDto {
-  @ApiProperty({ example: 'Mens Cotton T-Shirt' })
-  @IsString()
+export class ProductCreateDto {  @ApiProperty({ example: 'Mens Cotton T-Shirt' })
+  @IsString({ message: 'Title must be a string' })
   title: string;
 
   @ApiProperty({ example: 'Comfortable cotton t-shirt for everyday wear' })
-  @IsString()
+  @IsString({ message: 'Description must be a string' })
   description: string;
-
-  @ApiProperty({ example: 'mens-cotton-t-shirt' })
+  @ApiPropertyOptional({ example: 'mens-cotton-t-shirt', description: 'Automatically generated from title if not provided' })
+  @IsOptional()
   @IsString()
-  slug: string;
+  slug?: string;
 
   @ApiPropertyOptional({ example: 'TCT001' })
   @IsOptional()
   @IsString()
-  sku?: string;
-
+  sku?: string;  
   @ApiProperty({ example: 29.99 })
-  @IsNumber()
+  @IsNumber({}, { message: 'Price must be a valid number' })
   @Type(() => Number)
   price: number;
-
-  @ApiProperty({ example: 'vendor-uuid' })
-  @IsString()
-  @IsUUID()
-  vendor_id: string;
 
   @ApiPropertyOptional({ example: ['image1.jpg', 'image2.jpg'] })
   @IsOptional()
@@ -37,15 +30,11 @@ export class ProductCreateDto {
   @IsString({ each: true })
   images?: string[];
 
-  @ApiPropertyOptional({ enum: ProductType, example: ProductType.PARENT })
-  @IsOptional()
-  @IsEnum(ProductType)
-  product_type?: ProductType;
+ 
 
   @ApiPropertyOptional({ example: 'parent-product-uuid' })
   @IsOptional()
   @IsString()
-  @IsUUID()
   parent_id?: string;
 
   @ApiPropertyOptional({ example: 'Nike' })
@@ -68,11 +57,10 @@ export class ProductCreateDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
-  @ApiPropertyOptional({ example: 'category-uuid' })
-  @IsOptional()
-  @IsString()
-  @IsUUID()
-  category_id?: string;
+    @ApiProperty({ example: 'category-uuid', required: true })
+  @IsString({ message: 'Category ID must be a valid string' })
+  @IsUUID('4', { message: 'Category ID must be a valid UUID' })
+  category_id: string;
 
   @ApiPropertyOptional({ example: 100, description: 'Initial inventory quantity' })
   @IsOptional()

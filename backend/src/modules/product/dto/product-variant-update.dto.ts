@@ -88,7 +88,7 @@ export class ProductVariantUpdateDto {
   @IsEnum(ProductType)
   status?: ProductType;
 
-  @ApiPropertyOptional({ description: 'Variant images URLs' })
+  @ApiPropertyOptional({ description: 'Variant images URLs'  , })
   @IsOptional()
   @IsArray()
   @IsUrl({}, { each: true })

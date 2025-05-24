@@ -29,12 +29,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             message = exception.message;
             errors = Array.isArray(exception.errors) 
                 ? exception.errors 
-                : Object.values(exception.errors || {});
-        } else if (exception instanceof HttpException) {
+                : Object.values(exception.errors || {});        } else if (exception instanceof HttpException) {
             status = exception.getStatus();
             const exceptionResponse = exception.getResponse() as any;
             
             message = exceptionResponse.message || exception.message;
+            
+            // Special handling for validation errors to preserve field names
+            if (exceptionResponse.isValidationError) {
+                // Keep the errors as an object mapping fields to error messages
+                const apiError = new ApiError(status, message, exceptionResponse.errors);
+                const apiResponse = new ApiResponse(null, apiError);
+                return response.status(status).json(apiResponse);
+            }
+            
             errors = Array.isArray(exceptionResponse.errors) 
                 ? exceptionResponse.errors 
                 : Array.isArray(exceptionResponse.message)
