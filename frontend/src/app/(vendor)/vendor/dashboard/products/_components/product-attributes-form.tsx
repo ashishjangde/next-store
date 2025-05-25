@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ProductActions } from "@/api-actions/product-actions";
+import { CategoryActions } from "@/api-actions/categories-actions";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,82 +33,69 @@ interface ProductAttributesFormProps {
 
 export const ProductAttributesForm = ({ product }: ProductAttributesFormProps) => {
   const queryClient = useQueryClient();
+  const [selectedAttribute, setSelectedAttribute] = useState("");
   const [selectedAttributeValue, setSelectedAttributeValue] = useState("");
   const [loading, setLoading] = useState(false);
+
   // Group existing product attribute values by attribute name
-  const existingAttributes = product.ProductAttribute || [];
-  const groupedAttributes: Record<string, { attribute_id: string; values: AttributeValue[] }> = {};
+  const existingAttributes = product.attributes || [];
+  const groupedAttributes: Record<string, { attribute_id: string; values: any[] }> = {};
   
-  existingAttributes.forEach((attr) => {
-    if (attr.AttributeValue?.Attribute?.name) {
-      const attrName = attr.AttributeValue.Attribute.name;
+  existingAttributes.forEach((attr: any) => {
+    if (attr.name) {
+      const attrName = attr.name;
       
       if (!groupedAttributes[attrName]) {
         groupedAttributes[attrName] = {
-          attribute_id: attr.AttributeValue.Attribute.id,
+          attribute_id: attr.id,
           values: [],
         };
       }
       
-      // Add the attribute value to the group if it exists
-      if (attr.AttributeValue) {
-        groupedAttributes[attrName].values.push(attr.AttributeValue);
-      }
+      // Add the attribute value to the group
+      groupedAttributes[attrName].values.push({
+        id: attr.id,
+        value: attr.value,
+        display_value: attr.display_value || attr.value,
+      });
     }
   });
 
-  // Fetch all available attributes
-  const { data: attributesData } = useQuery({
-    queryKey: ["attributes"],
+  // Fetch category attributes
+  const { data: categoryData, isLoading: isLoadingCategory } = useQuery({
+    queryKey: ["category", product.category_id],
     queryFn: async () => {
-      // Assuming you have an AttributeActions API service or you can use a general API call here
-      const response = await fetch("/api/attributes");
-      const data = await response.json();
-      return data;
+      const response = await CategoryActions.getCategoryById(
+        product.category_id,
+        false,
+        true // includeAttributes
+      );
+      return response.data;
     },
-    enabled: false, // Temporarily disabled until we have the actual API
+    enabled: !!product.category_id,
   });
-  
-  // For now, let's use static data as a placeholder
-  const availableAttributes = [
-    {
-      id: "1",
-      name: "Color",
-      values: [
-        { id: "101", value: "Red" },
-        { id: "102", value: "Blue" },
-        { id: "103", value: "Green" },
-      ]
-    },
-    {
-      id: "2",
-      name: "Size",
-      values: [
-        { id: "201", value: "Small" },
-        { id: "202", value: "Medium" },
-        { id: "203", value: "Large" },
-      ]
-    },
-    {
-      id: "3",
-      name: "Material",
-      values: [
-        { id: "301", value: "Cotton" },
-        { id: "302", value: "Polyester" },
-        { id: "303", value: "Wool" },
-      ]
-    }
-  ];
 
+  // Get category attributes
+  const categoryAttributes = categoryData?.attributes || [];
+  
   // Add attribute to product
   const { mutate: addAttribute } = useMutation({
     mutationFn: ({ productId, attributeValueId }: { productId: string, attributeValueId: string }) => {
       return ProductActions.addAttributeToProduct(productId, attributeValueId);
-    },
+    },    
     onSuccess: () => {
       toast.success("Attribute added successfully");
-      queryClient.invalidateQueries({ queryKey: ["product", product.id] });
+      // Invalidate and refetch the product query immediately
+      queryClient.invalidateQueries({ 
+        queryKey: ["product", product.id],
+        refetchType: 'active'
+      });
+      // Also refetch to ensure immediate update
+      queryClient.refetchQueries({ 
+        queryKey: ["product", product.id]
+      });
       setSelectedAttributeValue("");
+      setSelectedAttribute("");
     },
     onError: (error) => {
       console.error("Error adding attribute:", error);
@@ -122,7 +110,15 @@ export const ProductAttributesForm = ({ product }: ProductAttributesFormProps) =
     },
     onSuccess: () => {
       toast.success("Attribute removed successfully");
-      queryClient.invalidateQueries({ queryKey: ["product", product.id] });
+      // Invalidate and refetch the product query immediately
+      queryClient.invalidateQueries({ 
+        queryKey: ["product", product.id],
+        refetchType: 'active'
+      });
+      // Also refetch to ensure immediate update
+      queryClient.refetchQueries({ 
+        queryKey: ["product", product.id]
+      });
     },
     onError: (error) => {
       console.error("Error removing attribute:", error);
@@ -148,28 +144,78 @@ export const ProductAttributesForm = ({ product }: ProductAttributesFormProps) =
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4">
+          {/* First Select: Choose Attribute Type */}
           <Select 
-            value={selectedAttributeValue} 
-            onValueChange={setSelectedAttributeValue}
+            value={selectedAttribute} 
+            onValueChange={(value) => {
+              setSelectedAttribute(value);
+              setSelectedAttributeValue(""); // Reset value selection when attribute changes
+            }}
+            disabled={isLoadingCategory}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select an attribute value" />
+              <SelectValue placeholder={isLoadingCategory ? "Loading attributes..." : "Select attribute type"} />
             </SelectTrigger>
             <SelectContent>
-              {availableAttributes.map((attribute) => (
-                <SelectGroup key={attribute.id}>
-                  <SelectLabel>{attribute.name}</SelectLabel>
-                  {attribute.values.map((value) => (
-                    <SelectItem key={value.id} value={value.id}>
-                      {value.value}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
+              {isLoadingCategory ? (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="ml-2">Loading attributes...</span>
+                </div>
+              ) : categoryAttributes.length === 0 ? (
+                <div className="py-2 px-4 text-sm text-muted-foreground">
+                  No attributes available for this category
+                </div>
+              ) : (
+                categoryAttributes.map((categoryAttr) => (
+                  <SelectItem key={categoryAttr.attribute_id} value={categoryAttr.attribute_id}>
+                    {categoryAttr.attribute?.name}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
-          <Button onClick={handleAddAttribute} disabled={!selectedAttributeValue || loading}>
+          
+          {/* Second Select: Choose Attribute Value */}
+          <Select
+            value={selectedAttributeValue} 
+            onValueChange={setSelectedAttributeValue}
+            disabled={!selectedAttribute || isLoadingCategory}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={!selectedAttribute ? "Select attribute type first" : "Select value"} />
+            </SelectTrigger>
+            <SelectContent>
+              {!selectedAttribute ? (
+                <div className="py-2 px-4 text-sm text-muted-foreground">
+                  Please select an attribute type first
+                </div>
+              ) : (
+                (() => {
+                  const selectedCategoryAttr = categoryAttributes.find(
+                    attr => attr.attribute_id === selectedAttribute
+                  );
+                  const selectedAttr = selectedCategoryAttr?.attribute;
+                  
+                  if (!selectedAttr || !selectedAttr.values || selectedAttr.values.length === 0) {
+                    return (
+                      <div className="py-2 px-4 text-sm text-muted-foreground">
+                        No values available for this attribute
+                      </div>
+                    );
+                  }
+                  return selectedAttr.values.map((value) => (
+                    <SelectItem key={value.id} value={value.id}>
+                      {value.display_value || value.value}
+                    </SelectItem>
+                  ));
+                })()
+              )}
+            </SelectContent>
+          </Select>
+          
+          <Button onClick={handleAddAttribute} disabled={!selectedAttributeValue || loading || isLoadingCategory}>
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Add Attribute
           </Button>

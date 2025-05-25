@@ -1,12 +1,12 @@
 /**
  * Product types as defined in the database schema
  */
-type ProductTypeEnum = 'PARENT' | 'VARIANT';
+export type ProductTypeEnum = 'PARENT' | 'VARIANT';
 
 /**
  * Basic product interface
  */
-interface Product {
+export interface Product {
   id: string;
   title: string;
   description: string;
@@ -27,28 +27,23 @@ interface Product {
   category?: Category;
   parent?: Product;
   children?: Product[];
-  ProductAttribute?: ProductAttribute[];
-}
-
-/**
- * Product attribute relationship
- */
-interface ProductAttribute {
-  product_id: string;
-  attribute_value_id: string;
-  AttributeValue?: {
+  attributes?: {
     id: string;
-    attribute_id: string;
+    name: string;
     value: string;
     display_value?: string;
-    Attribute?: Attribute;
-  }
+  }[];
+  inventory?: {
+    quantity: number;
+    low_stock_threshold: number;
+    reserved_quantity: number;
+  };
 }
 
 /**
  * Product create input data
  */
-interface ProductCreateInput {
+export interface ProductCreateInput {
   title: string;
   description: string;
   slug?: string;
@@ -69,12 +64,14 @@ interface ProductCreateInput {
 /**
  * Product update input data - all fields are optional
  */
-interface ProductUpdateInput extends Partial<ProductCreateInput> {}
+export interface ProductUpdateInput extends Partial<Omit<ProductCreateInput, 'images'>> {
+  images?: string[] | File[];
+}
 
 /**
  * Product list response with pagination
  */
-interface ProductListResponse {
+export interface ProductListResponse {
   products: Product[];
   totalItems: number;
   currentPage: number;

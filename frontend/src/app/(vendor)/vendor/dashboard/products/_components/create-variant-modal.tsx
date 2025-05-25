@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -24,9 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ImageUpload from "@/components/ui/image-upload";
+
 import { Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import CustomImageUpload from "@/components/common/custom-image-upload";
+
 
 interface CreateVariantModalProps {
   open: boolean;
@@ -63,11 +65,11 @@ export const CreateVariantModal = ({
       parentProductId,
       { include_attributes: true }
     ),
-    enabled: open,
+  enabled: open,
   });
 
   const parentProduct = parentProductData?.data;
-  const availableAttributes = parentProduct?.ProductAttribute || [];
+  const availableAttributes = parentProduct?.attributes || [];
 
   const form = useForm<FormData>({
     defaultValues: {
@@ -108,21 +110,23 @@ export const CreateVariantModal = ({
     }
 
     createVariant(data);
-  };
-  // Group attributes by attribute name
-  const groupedAttributes: Record<string, { attribute_id: string; values: AttributeValue[] }> = {};
+  };  // Group attributes by attribute name
+  const groupedAttributes: Record<string, { attribute_id: string; values: any[] }> = {};
 
-  availableAttributes.forEach((productAttr) => {
-    const attributeValue = productAttr.AttributeValue;
-    if (attributeValue?.Attribute) {
-      const attrName = attributeValue.Attribute.name;
+  availableAttributes.forEach((attr) => {
+    if (attr.name) {
+      const attrName = attr.name;
       if (!groupedAttributes[attrName]) {
         groupedAttributes[attrName] = {
-          attribute_id: attributeValue.Attribute.id,
+          attribute_id: attr.id,
           values: [],
         };
       }
-      groupedAttributes[attrName].values.push(attributeValue);
+      groupedAttributes[attrName].values.push({
+        id: attr.id,
+        value: attr.value,
+        display_value: attr.display_value || attr.value,
+      });
     }
   });
   return (
@@ -263,10 +267,12 @@ export const CreateVariantModal = ({
               <FormMessage />
             </div>            <div>
               <FormLabel>Images (Optional)</FormLabel>
-              <ImageUpload
+              <CustomImageUpload
                 value={imagePreview}
                 disabled={isPending}
-                onChange={(file) => {
+                onChange={(files) => {
+                  // Handle both single file and array of files
+                  const file = Array.isArray(files) ? files[0] : files;
                   if (file) {
                     setSelectedImage(file);
                     setImagePreview(URL.createObjectURL(file));

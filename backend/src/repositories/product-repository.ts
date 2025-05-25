@@ -4,6 +4,8 @@ import { PrismaService } from 'src/common/db/prisma/prisma.service';
 import { RedisService } from 'src/common/db/redis/redis.service';
 import { ElasticsearchService } from 'src/common/db/elasticsearch/elasticsearch.service';
 import { handleDatabaseOperations } from 'src/common/utils/utils';
+import { ProductCreateDto } from 'src/modules/product/dto/product-create.dto';
+import { ProductUpdateDto } from 'src/modules/product/dto/product-update.dto';
 
 @Injectable()
 export class ProductRepository {
@@ -15,15 +17,22 @@ export class ProductRepository {
     private elasticsearch: ElasticsearchService
   ) {}
 
-  private async cacheProduct(product: any): Promise<void> {
-    try {
-      await this.redis.pipeline([
-        { key: `product:id:${product.id}`, value: product },
-        { key: `product:slug:${product.slug}`, value: product }
-      ]);
-    } catch (error) {
-      this.logger.error(`Error caching product: ${error.message}`, error);
-    }
+  private async cacheProduct(product: Product & { children?: Product[] }) {
+    // Delete old cache entries first
+    await this.redis.pipelineDel([
+      `product:${product.id}`,
+      `product:slug:${product.slug}`,
+      `product:variants:${product.id}`,
+      `vendor:products:${product.vendor_id}`,
+    ]);
+
+    // Set new cache entries with TTL
+    await this.redis.pipeline([
+      { key: `product:${product.id}`, value: product },
+      { key: `product:slug:${product.slug}`, value: product },
+      { key: `product:variants:${product.id}`, value: product.children || [] },
+      { key: `vendor:products:${product.vendor_id}`, value: product }
+    ]);
   }
 
   private async indexProductToElasticsearch(product: any): Promise<void> {
@@ -52,41 +61,24 @@ export class ProductRepository {
       this.logger.log(`Product ${product.id} (${product.title}) indexed in Elasticsearch`);
     } catch (error) {
       this.logger.error(`Error indexing product to Elasticsearch: ${error.message}`, error);
-      // We don't throw the error here as indexing failure shouldn't block the main operation
     }
   }
 
-  async createProduct(data: Prisma.ProductCreateInput): Promise<Product | null> {
-    try {
-      const product = await handleDatabaseOperations(() =>
-        this.prisma.product.create({
-          data,
-          include: {
-            category: true,
-            attributeValues: {
-              include: {
-                attributeValue: {
-                  include: {
-                    attribute: true
-                  }
-                }
-              }
-            },
-            Vendor: true,
-            Inventory: true
-          }
-        }),
-      );
+  async createProduct(data: ProductCreateDto & { vendor_id: string }): Promise<Product> {
+    const { parent_id, category_id, vendor_id, ...rest } = data;
+    const product = await this.prisma.product.create({
+      data: {
+        ...rest,
+        slug: rest.slug || rest.title.toLowerCase().replace(/\s+/g, '-'),
+        Vendor: { connect: { id: vendor_id } },
+        category: category_id ? { connect: { id: category_id } } : undefined,
+        parent: parent_id ? { connect: { id: parent_id } } : undefined,
+      },
+      include: this.buildIncludeObject(),
+    });
 
-      if (product) {
-        await this.cacheProduct(product);
-        await this.indexProductToElasticsearch(product);
-      }
-      return product;
-    } catch (error) {
-      this.logger.error(`Error creating product: ${error.message}`, error);
-      return null;
-    }
+    await this.cacheProduct(product);
+    return product;
   }
 
   async findProductById(id: string, includeCategory = false, includeAttributes = false, includeChildren = false): Promise<any | null> {
@@ -102,43 +94,7 @@ export class ProductRepository {
       }
 
       // Set up the database query with requested relations
-      const include: any = {
-        Vendor: true,
-        Inventory: true
-      };
-
-      if (includeCategory) {
-        include.category = true;
-      }
-
-      if (includeAttributes) {
-        include.attributeValues = {
-          include: {
-            attributeValue: {
-              include: {
-                attribute: true
-              }
-            }
-          }
-        };
-      }
-
-      if (includeChildren) {
-        include.children = {
-          include: {
-            Inventory: true,
-            attributeValues: includeAttributes ? {
-              include: {
-                attributeValue: {
-                  include: {
-                    attribute: true
-                  }
-                }
-              }
-            } : undefined
-          }
-        };
-      }
+      const include = this.buildIncludeObject(includeCategory, includeAttributes, includeChildren);
 
       // Fetch product from database
       const product = await handleDatabaseOperations(() =>
@@ -148,9 +104,9 @@ export class ProductRepository {
         }),
       );
 
-      // If product found, cache it in Redis
+      // If product found, cache it in Redis with a short TTL
       if (product) {
-        await this.redis.set(cacheKey, product);
+        await this.redis.set(cacheKey, product, 300); // 5 minutes TTL
         this.logger.log(`Product ${id} cached in Redis`);
       }
       
@@ -451,7 +407,7 @@ export class ProductRepository {
             product_type: 'VARIANT'
           },
           include: {
-            Inventory: true,
+            Inventory: true, // Always include inventory for variants
             attributeValues: {
               include: {
                 attributeValue: {
@@ -466,7 +422,7 @@ export class ProductRepository {
       );
 
       if (variants) {
-        await this.redis.set(cacheKey, variants);
+        await this.redis.set(cacheKey, variants, 300); // 5 minutes TTL
       }
       return variants;
     } catch (error) {
@@ -475,45 +431,20 @@ export class ProductRepository {
     }
   }
 
-  async updateProduct(id: string, data: Prisma.ProductUpdateInput): Promise<any | null> {
-    try {
-      const product = await handleDatabaseOperations(() =>
-        this.prisma.product.update({
-          where: { id },
-          data,
-          include: {
-            category: true,
-            attributeValues: {
-              include: {
-                attributeValue: {
-                  include: {
-                    attribute: true
-                  }
-                }
-              }
-            },
-            Vendor: true,
-            Inventory: true,
-            children: true
-          }
-        }),
-      );
+  async updateProduct(id: string, data: ProductUpdateDto): Promise<Product> {
+    const { parent_id, category_id, ...rest } = data;
+    const product = await this.prisma.product.update({
+      where: { id },
+      data: {
+        ...rest,
+        category: category_id ? { connect: { id: category_id } } : undefined,
+        parent: parent_id ? { connect: { id: parent_id } } : undefined,
+      },
+      include: this.buildIncludeObject(),
+    });
 
-      if (product) {
-        await this.cacheProduct(product);
-        await this.indexProductToElasticsearch(product);
-        // Clear related cache
-        await this.redis.pipelineDel([
-          `product:slug:${product.slug}`,
-          `product:variants:${product.parent_id}`,
-          `products:vendor:${product.vendor_id}`
-        ]);
-      }
-      return product;
-    } catch (error) {
-      this.logger.error(`Error updating product: ${error.message}`, error);
-      return null;
-    }
+    await this.cacheProduct(product);
+    return product;
   }
 
   async deleteProduct(id: string): Promise<boolean> {
@@ -793,26 +724,33 @@ export class ProductRepository {
     sortBy: string = 'created_at', 
     sortOrder: 'asc' | 'desc' = 'desc'
   ): Promise<any> {
-    const searchBody: any = {
-      query: {
-        bool: {
-          must: [
-            {
-              multi_match: {
-                query,
-                fields: ['title^3', 'description^2', 'sku', 'short_description', 'brand'],
-                type: 'best_fields',
-                fuzziness: 'AUTO'
-              }
-            }
-          ],
-          filter: [] as any[]
+   const searchBody: any = {
+  query: {
+    bool: {
+      should: [
+        {
+          multi_match: {
+            query,
+            fields: ['title^3', 'description^2', 'sku', 'short_description', 'brand'],
+            type: 'best_fields',
+            fuzziness: 'AUTO'
+          }
+        },
+        {
+          wildcard: {
+            'title.keyword': `*${query.toLowerCase()}*`
+          }
         }
-      },
-      from: (page - 1) * pageSize,
-      size: pageSize,
-      sort: [] as any[]
-    };
+      ],
+      filter: [] as any[],
+      minimum_should_match: 1
+    }
+  },
+  from: (page - 1) * pageSize,
+  size: pageSize,
+  sort: [] as any[]
+};
+
 
     // Add filters
     if (filters.categoryId) {
@@ -1139,7 +1077,7 @@ export class ProductRepository {
   private buildIncludeObject(includeCategory = false, includeAttributes = false, includeChildren = false) {
     const include: any = {
       Vendor: true,
-      Inventory: true
+      Inventory: true // Always include inventory for all products
     };
 
     if (includeCategory) {
@@ -1161,7 +1099,7 @@ export class ProductRepository {
     if (includeChildren) {
       include.children = {
         include: {
-          Inventory: true,
+          Inventory: true, // Always include inventory for children
           attributeValues: includeAttributes ? {
             include: {
               attributeValue: {

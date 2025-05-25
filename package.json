@@ -1,0 +1,13 @@
+{
+    "name": "next-store-ecommerce",
+    "version": "1.0.0",
+    "description": "An awesome Next.js eCommerce project",
+    "main": "index.js",
+    "scripts": {
+        "dev": "concurrently \"cd frontend && npm run dev\" \"cd backend && docker-compose -f docker-compose-es.yml up -d && npm run start:dev\""
+    },
+    "author": "Ashish Jangde <ashishjangde54@gmail.com>",
+    "devDependencies": {
+        "concurrently": "^9.1.2"
+    }
+}

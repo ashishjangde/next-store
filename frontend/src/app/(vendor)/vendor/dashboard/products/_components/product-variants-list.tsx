@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProductActions } from "@/api-actions/product-actions";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ import { Loader2, Plus, ImageOff } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { CreateVariantModal } from "./create-variant-modal";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -35,7 +33,6 @@ interface ProductVariantsListProps {
 export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Fetch product with its variants
   const { data, isLoading } = useQuery({
@@ -94,18 +91,8 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
       deleteVariant(variantId);
     }
   };
-
   return (
     <>
-      <CreateVariantModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        parentProductId={productId}
-        onSuccess={() => {
-          setIsCreateModalOpen(false);
-          queryClient.invalidateQueries({ queryKey: ["product-variants", productId] });
-        }}
-      />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -114,7 +101,7 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
               Manage variants for {product.title}
             </CardDescription>
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
+          <Button onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Variant
           </Button>
@@ -130,8 +117,7 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   Create variants based on attributes like color, size, or material to give your customers options.
                 </p>
-              </div>
-              <Button onClick={() => setIsCreateModalOpen(true)}>
+              </div>              <Button onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Your First Variant
               </Button>
@@ -168,14 +154,13 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                             No image
                           </div>
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </TableCell>                      <TableCell>
                         <div className="font-medium">{variant.title}</div>
                         <div className="text-xs text-muted-foreground">
                           {/* Show variant attributes if available */}
-                          {variant.ProductAttribute?.map((attr, i, arr) => (
-                            <span key={attr.attribute_value_id}>
-                              {attr.AttributeValue?.Attribute?.name}: {attr.AttributeValue?.value}
+                          {variant.attributes?.map((attr, i, arr) => (
+                            <span key={attr.id}>
+                              {attr.name}: {attr.value}
                               {i < arr.length - 1 ? ", " : ""}
                             </span>
                           ))}

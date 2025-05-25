@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { InventoryActions } from "@/api-actions/inventory-actions";
-import { variationInventoryUpdateSchema } from "@/schema/inventory-schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,6 +26,7 @@ import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Product } from "@/types/product";
 
 interface VariantsInventoryProps {
   product: Product;
@@ -113,19 +113,14 @@ export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps
 
   const variants = product.children || [];  // Function to get variant attribute display
   const getVariantAttributes = (variant: Product) => {
-    if (!variant.ProductAttribute || variant.ProductAttribute.length === 0) {
-      return "-";
+    // Check for attributes structure
+    if (variant.attributes && variant.attributes.length > 0) {
+      return variant.attributes
+        .map((attr) => `${attr.name}: ${attr.value}`)
+        .join(", ");
     }
-
-    return variant.ProductAttribute
-      .map((attr) => {
-        if (attr.AttributeValue?.Attribute?.name) {
-          return `${attr.AttributeValue.Attribute.name}: ${attr.AttributeValue.value}`;
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join(", ");
+    
+    return "-";
   };
 
   // Function to determine stock status

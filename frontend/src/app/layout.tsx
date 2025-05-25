@@ -3,6 +3,9 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import GlobalContextProvider from "@/components/context";
 
+// Import React 19 error handler for compatibility
+import "@/utils/react19-error-handler";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

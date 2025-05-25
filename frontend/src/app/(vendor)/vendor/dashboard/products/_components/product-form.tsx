@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Trash } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import ImageUpload from "@/components/ui/image-upload";
+
 import { ProductActions } from "@/api-actions/product-actions";
 import { CategoryActions } from "@/api-actions/categories-actions";
 import { productUpdateSchema } from "@/schema/product-schema";
@@ -37,30 +37,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductAttributesForm } from "./product-attributes-form";
 import { ProductVariantsList } from "./product-variants-list";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-type Category = {
-  id: string;
-  name: string;
-};
+import CustomImageUpload from "@/components/common/custom-image-upload";
+import { Product, ProductCreateInput } from "@/types/product";
 
 interface ProductFormProps {
-  initialData: Product;
+  initialData?: Product;
 }
 
 type FormData = Zod.infer<typeof productUpdateSchema>;
 
 export const ProductForm = ({ initialData }: ProductFormProps) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>(
-    initialData.images?.[0] || ""
-  );
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
   
-    const { data: categoriesData } = useQuery({
+  // Get product ID from query parameter
+  const productId = searchParams.get("update");
+  
+  // Fetch product data if in update mode
+  const { data: productData } = useQuery({
+    queryKey: ["product", productId],
+    queryFn: async () => {
+      if (!productId) return null;
+      return await ProductActions.getProductById(productId);
+    },
+    enabled: !!productId,
+  });
+  
+  const { data: categoriesData } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
       return await CategoryActions.getRootCategories();
@@ -71,32 +81,75 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
   const categories = categoriesData?.data || [];
   const form = useForm<FormData>({
     defaultValues: {
-      title: initialData.title,
-      description: initialData.description || "",
-      price: initialData.price,
-      sku: initialData.sku || "",
-      category_id: initialData.category_id || "",
-      is_active: initialData.is_active,
+      title: productData?.data?.title || "",
+      description: productData?.data?.description || "",
+      price: productData?.data?.price || 0,
+      sku: productData?.data?.sku || "",
+      category_id: productData?.data?.category_id || "",
+      is_active: productData?.data?.is_active ?? true,
     },
   });
 
-  const { mutate: updateProduct, isPending } = useMutation({
+  // Update form when product data is loaded
+  useEffect(() => {
+    if (productData?.data) {
+      form.reset({
+        title: productData.data.title,
+        description: productData.data.description || "",
+        price: productData.data.price,
+        sku: productData.data.sku || "",
+        category_id: productData.data.category_id,
+        is_active: productData.data.is_active,
+      });
+      setImagePreviews(productData.data.images || []);
+      setExistingImages(productData.data.images || []);
+    }
+  }, [productData, form]);
+
+  const { mutate: updateProduct, isPending: isUpdating } = useMutation({
     mutationFn: (data: FormData & { images?: File[] }) => {
-      return ProductActions.updateProduct(initialData.id, data);
+      if (productId) {
+        return ProductActions.updateProduct(productId, data);
+      } else {
+        // Ensure required fields are present for create
+        const createData: ProductCreateInput = {
+          title: data.title || "",
+          description: data.description || "",
+          price: data.price || 0,
+          category_id: data.category_id || "",
+          images: data.images as File[],
+          is_active: data.is_active ?? true,
+          sku: data.sku,
+          slug: data.slug,
+          brand: data.brand,
+          season: data.season,
+          weight: data.weight,
+          parent_id: data.parent_id,
+          initial_quantity: data.initial_quantity,
+          low_stock_threshold: data.low_stock_threshold,
+          attribute_value_ids: data.attribute_value_ids,
+        };
+        return ProductActions.createProduct(createData);
+      }
     },
-    onSuccess: () => {
-      toast.success("Product updated successfully");
-      queryClient.invalidateQueries({ queryKey: ["product", initialData.id] });
+    onSuccess: (response) => {
+      toast.success(productId ? "Product updated successfully" : "Product created successfully");
+      if (productId) {
+        queryClient.invalidateQueries({ queryKey: ["product", productId] });
+      }
       queryClient.invalidateQueries({ queryKey: ["vendor-products"] });
+      if (!productId && response?.data?.id) {
+        router.push(`/vendor/dashboard/products/new?update=${response.data.id}`);
+      }
       router.refresh();
     },
     onError: (error) => {
-      console.error("Error updating product:", error);
-      toast.error("Failed to update product");
+      console.error("Error saving product:", error);
+      toast.error(productId ? "Failed to update product" : "Failed to create product");
     },
   });
 
-  const { mutate: deleteProduct } = useMutation({
+  const { mutate: deleteProduct, isPending: isDeleting } = useMutation({
     mutationFn: (id: string) => ProductActions.deleteProduct(id),
     onSuccess: () => {
       toast.success("Product deleted successfully");
@@ -114,62 +167,152 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
   };
 
   const onDelete = async () => {
+    if (!productId) return;
     setLoading(true);
     try {
-      await deleteProduct(initialData.id);
+      await deleteProduct(productId);
     } catch (error) {
       toast.error("Something went wrong. Please try again.");
       setLoading(false);
     }
   };
-  const handleImageChange = async (file: File | null) => {
-    if (!file) return;
+
+  const handleImageChange = (files: File[] | File | string[] | null) => {
+    if (!files) return;
     
-    try {
-      setLoading(true);
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
+    if (Array.isArray(files)) {
+      if (files.length === 0) return;
       
-      const result = await ProductActions.updateProduct(initialData.id, {
-        images: [file],
-      });
-      
-      if (result.data) {
-        toast.success("Image updated successfully");
-        queryClient.invalidateQueries({ queryKey: ["product", initialData.id] });
-      } else {
-        toast.error("Failed to update image");
+      // Handle string array (reordering)
+      if (typeof files[0] === 'string') {
+        const stringArray = files as string[];
+        setImagePreviews(stringArray);
+        if (productId) {
+          // Update backend with new order
+          ProductActions.updateProduct(productId, {
+            images: stringArray,
+          }).then((result) => {
+            if (result.data) {
+              toast.success("Image order updated successfully");
+              queryClient.invalidateQueries({ queryKey: ["product", productId] });
+              setExistingImages(stringArray);
+            } else {
+              toast.error("Failed to update image order");
+              // Revert on failure
+              setImagePreviews([...existingImages, ...selectedImages.map(file => URL.createObjectURL(file))]);
+            }
+          }).catch((error) => {
+            console.error("Error updating image order:", error);
+            toast.error("Failed to update image order");
+            // Revert on error
+            setImagePreviews([...existingImages, ...selectedImages.map(file => URL.createObjectURL(file))]);
+          });
+        } else {
+          setExistingImages(stringArray);
+        }
+        return;
       }
-    } catch (error) {
-      console.error("Error updating image:", error);
-      toast.error("Failed to update image");
-    } finally {
-      setLoading(false);
+      
+      // Handle File array (new uploads)
+      const fileArray = files as File[];
+      const newPreviews = fileArray.map(file => URL.createObjectURL(file));
+      setImagePreviews(prev => [...prev, ...newPreviews]);
+      setSelectedImages(fileArray);
+      
+      if (productId) {
+        // Update backend with new images
+        ProductActions.updateProduct(productId, {
+          images: [...existingImages, ...newPreviews],
+        }).then((result) => {
+          if (result.data) {
+            toast.success("Images updated successfully");
+            queryClient.invalidateQueries({ queryKey: ["product", productId] });
+            setExistingImages([...existingImages, ...newPreviews]);
+          } else {
+            toast.error("Failed to update images");
+            // Revert on failure
+            setImagePreviews(existingImages);
+          }
+        }).catch((error) => {
+          console.error("Error updating images:", error);
+          toast.error("Failed to update images");
+          // Revert on error
+          setImagePreviews(existingImages);
+        });
+      } else {
+        // For new products, just update the previews
+        setExistingImages([...existingImages, ...newPreviews]);
+      }
+    } else {
+      // Handle single File
+      const file = files as File;
+      const preview = URL.createObjectURL(file);
+      setImagePreviews([preview]);
+      setSelectedImages([file]);
+      
+      if (productId) {
+        // Update backend with new image
+        ProductActions.updateProduct(productId, {
+          images: [preview],
+        }).then((result) => {
+          if (result.data) {
+            toast.success("Image updated successfully");
+            queryClient.invalidateQueries({ queryKey: ["product", productId] });
+            setExistingImages([preview]);
+          } else {
+            toast.error("Failed to update image");
+            // Revert on failure
+            setImagePreviews(existingImages);
+          }
+        }).catch((error) => {
+          console.error("Error updating image:", error);
+          toast.error("Failed to update image");
+          // Revert on error
+          setImagePreviews(existingImages);
+        });
+      } else {
+        // For new products, just update the previews
+        setExistingImages([preview]);
+      }
     }
   };
 
+  // Cleanup object URLs when component unmounts or previews change
+  useEffect(() => {
+    return () => {
+      selectedImages.forEach(file => {
+        URL.revokeObjectURL(URL.createObjectURL(file));
+      });
+    };
+  }, [selectedImages]);
+
   return (
-    <>      <AlertModal
-        isOpen={open}
-        onClose={() => setOpen(false)}
-        onConfirm={onDelete}
-        loading={loading}
-        title="Delete Product"
-        description="Are you sure you want to delete this product? This action cannot be undone."
-      />
+    <>
+      {productId && (
+        <AlertModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          onConfirm={onDelete}
+          loading={loading}
+          title="Delete Product"
+          description="Are you sure you want to delete this product? This action cannot be undone."
+        />
+      )}
       <div className="flex items-center justify-between">
         <PageHeader
-          title="Edit Product"
-          description={initialData.title}
+          title={productId ? "Edit Product" : "Create Product"}
+          description={productData?.data?.title || "Add a new product to your store"}
         />
-        <Button
-          disabled={loading}
-          variant="destructive"
-          size="sm"
-          onClick={() => setOpen(true)}
-        >
-          <Trash className="h-4 w-4" />
-        </Button>
+        {productId && (
+          <Button
+            disabled={loading}
+            variant="destructive"
+            size="sm"
+            onClick={() => setOpen(true)}
+          >
+            <Trash className="h-4 w-4" />
+          </Button>
+        )}
       </div>
       <Separator />
       
@@ -178,7 +321,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="attributes">Attributes</TabsTrigger>
-          {initialData.product_type === "PARENT" && (
+          {productData?.data?.product_type === "PARENT" && (
             <TabsTrigger value="variants">Variants</TabsTrigger>
           )}
         </TabsList>
@@ -188,7 +331,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
               <CardDescription>
-                Update your product details
+                {productId ? "Update your product details" : "Add your product details"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -203,7 +346,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                           <FormLabel>Title</FormLabel>
                           <FormControl>
                             <Input
-                              disabled={isPending}
+                              disabled={isUpdating}
                               placeholder="Product name"
                               {...field}
                             />
@@ -221,7 +364,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                           <FormLabel>SKU</FormLabel>
                           <FormControl>
                             <Input
-                              disabled={isPending}
+                              disabled={isUpdating}
                               placeholder="Stock keeping unit"
                               {...field}
                               value={field.value || ""}
@@ -241,7 +384,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                         <FormLabel>Description</FormLabel>
                         <FormControl>
                           <Textarea
-                            disabled={isPending}
+                            disabled={isUpdating}
                             placeholder="Product description"
                             className="resize-none min-h-[120px]"
                             {...field}
@@ -263,7 +406,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                           <FormControl>
                             <Input
                               type="number"
-                              disabled={isPending}
+                              disabled={isUpdating}
                               placeholder="0.00"
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value))}
@@ -272,7 +415,9 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                           <FormMessage />
                         </FormItem>
                       )}
-                    />                    <FormField
+                    />
+                    
+                    <FormField
                       control={form.control}
                       name="category_id"
                       render={({ field }) => (
@@ -282,7 +427,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                             <HierarchicalCategorySelect
                               value={field.value || ""}
                               onChange={(categoryId) => field.onChange(categoryId || "")}
-                              disabled={isPending}
+                              disabled={isUpdating || !!productId}
                               placeholder="Select a category"
                             />
                           </FormControl>
@@ -299,7 +444,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                           <FormLabel>Status</FormLabel>
                           <FormControl>
                             <Select
-                              disabled={isPending}
+                              disabled={isUpdating}
                               value={field.value ? "true" : "false"}
                               onValueChange={(value) => field.onChange(value === "true")}
                             >
@@ -318,16 +463,20 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
                     />
                   </div>
 
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      className="ml-auto"
-                      disabled={isPending}
-                    >
-                      {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Save Changes
-                    </Button>
-                  </div>
+                  <Button
+                    type="submit"
+                    disabled={isUpdating}
+                    className="w-full"
+                  >
+                    {isUpdating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {productId ? "Updating..." : "Creating..."}
+                      </>
+                    ) : (
+                      productId ? "Update Product" : "Create Product"
+                    )}
+                  </Button>
                 </form>
               </Form>
             </CardContent>
@@ -346,23 +495,57 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
               <div className="mb-4">
                 <p className="text-sm text-muted-foreground mb-4">
                   Upload images for your product. The first image will be used as the featured image.
-                </p>                <ImageUpload
-                  value={imagePreview}
+                </p>
+                <CustomImageUpload
+                  value={imagePreviews}
                   disabled={loading}
+                  multiple={true}
                   onChange={handleImageChange}
+                  onReorder={(newOrder) => {
+                    setImagePreviews(newOrder);
+                    if (productId) {
+                      // Update backend with new order
+                      ProductActions.updateProduct(productId, {
+                        images: newOrder,
+                      }).then((result) => {
+                        if (result.data) {
+                          toast.success("Image order updated successfully");
+                          queryClient.invalidateQueries({ queryKey: ["product", productId] });
+                          setExistingImages(newOrder);
+                        } else {
+                          toast.error("Failed to update image order");
+                          // Revert on failure
+                          setImagePreviews([...existingImages, ...selectedImages.map(file => URL.createObjectURL(file))]);
+                        }
+                      }).catch((error) => {
+                        console.error("Error updating image order:", error);
+                        toast.error("Failed to update image order");
+                        // Revert on error
+                        setImagePreviews([...existingImages, ...selectedImages.map(file => URL.createObjectURL(file))]);
+                      });
+                    } else {
+                      setExistingImages(newOrder);
+                    }
+                  }}
                 />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="attributes" className="space-y-4 pt-4">
-          <ProductAttributesForm product={initialData} />
-        </TabsContent>
-        
-        <TabsContent value="variants" className="space-y-4 pt-4">
-          <ProductVariantsList productId={initialData.id} />
-        </TabsContent>
+        {productId && productData?.data && (
+          <>
+            <TabsContent value="attributes" className="space-y-4 pt-4">
+              <ProductAttributesForm product={productData.data} />
+            </TabsContent>
+            
+            {productData.data.product_type === "PARENT" && (
+              <TabsContent value="variants" className="space-y-4 pt-4">
+                <ProductVariantsList productId={productId} />
+              </TabsContent>
+            )}
+          </>
+        )}
       </Tabs>
     </>
   );

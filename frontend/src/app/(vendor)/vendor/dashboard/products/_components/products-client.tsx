@@ -9,7 +9,6 @@ import { DataTable } from "@/components/ui/data-table";
 import { ProductColumns } from "./columns";
 import { PageHeader } from "@/components/common/page-header";
 import { ProductFilters } from "./product-filters";
-import { CreateProductModal } from "./create-product-modal";
 import { LoadingPage } from "@/components/common/loading";
 
 export const ProductsClient = () => {
@@ -88,13 +87,6 @@ export const ProductsClient = () => {
         data={filteredProducts}
       />
       
-      <CreateProductModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        onSuccess={() => {
-          setIsCreateModalOpen(false);
-        }}
-      />
     </div>
   );
 };

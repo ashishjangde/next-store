@@ -1,13 +1,14 @@
 import { ProductInventoryPage } from "../../_components/product-inventory-page";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default async function ProductInventory({ params }: PageProps) {
+  const { id } = await params;
   return (
-    <ProductInventoryPage productId={params.id} />
+    <ProductInventoryPage productId={id} />
   );
 }

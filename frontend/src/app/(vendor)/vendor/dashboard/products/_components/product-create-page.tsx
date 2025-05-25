@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { useForm } from "react-hook-form";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { parseAsString, useQueryState } from "nuqs";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import ImageUpload from "@/components/ui/image-upload";
+
 import {
   Form,
   FormControl,
@@ -33,6 +35,8 @@ import { ProductActions } from "@/api-actions/product-actions";
 import { CategoryActions } from "@/api-actions/categories-actions";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { HierarchicalCategorySelect } from "@/components/common/hierarchical-category-select";
+import CustomImageUpload from "@/components/common/custom-image-upload";
+
 
 type Category = {
   id: string;
@@ -46,16 +50,39 @@ type FormData = {
   sku?: string;
   category_id: string;
   is_active: boolean;
+  parent_id?: string; // Add parent_id for variants
+  attribute_value_ids?: string[]; // Add attribute values for variants
 };
 
 export const ProductCreatePage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateFromId = searchParams.get("duplicate");
-  
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
+    // Use nuqs for parent_id query parameter
+  const [parentId] = useQueryState("parent_id", parseAsString);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [mounted, setMounted] = useState(false);
+  
+  const isVariant = !!parentId;
+    // Handle image changes with proper cleanup
+  const handleImageChange = useCallback((files: File[] | File | null) => {
+    // Use flushSync for React 19 compatibility
+    flushSync(() => {
+      if (Array.isArray(files)) {
+        setSelectedImages(files);
+        // Don't create new object URLs here - let ImageUpload handle them
+        const urls = files.map(file => URL.createObjectURL(file));
+        setImagePreviews(urls);
+      } else if (files) {
+        setSelectedImages([files]);
+        setImagePreviews([URL.createObjectURL(files)]);
+      } else {
+        setSelectedImages([]);
+        setImagePreviews([]);
+      }
+    });
+  }, []);
   
   const form = useForm<FormData>({
     defaultValues: {
@@ -65,8 +92,10 @@ export const ProductCreatePage = () => {
       sku: "",
       category_id: "",
       is_active: true,
+      parent_id: parentId || undefined,
+      attribute_value_ids: [],
     },
-  });  // Fetch categories
+  });// Fetch categories
   const { data: categoriesData } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
@@ -74,7 +103,6 @@ export const ProductCreatePage = () => {
     },
     staleTime: 60000, // 1 minute
   });
-
   // If duplicating, fetch source product data
   const { data: sourceProductData, isLoading: isLoadingSource } = useQuery({
     queryKey: ["source-product", duplicateFromId],
@@ -84,27 +112,43 @@ export const ProductCreatePage = () => {
     },
     enabled: !!duplicateFromId && mounted,
   });
-  // Create product mutation
+
+  // If creating a variant, fetch parent product data
+  const { data: parentProductData, isLoading: isLoadingParent } = useQuery({
+    queryKey: ["parent-product", parentId],
+    queryFn: async () => {
+      if (!parentId) return null;
+      return await ProductActions.getProductById(parentId, {
+        include_attributes: true,
+      });
+    },
+    enabled: !!parentId && mounted,
+  });  // Create product mutation
   const { mutate: createProduct, isPending } = useMutation({
     mutationFn: (data: FormData) => {
       return ProductActions.createProduct({
         ...data,
-        images: selectedImage ? [selectedImage] : [],
+        images: selectedImages,
       });
     },
     onSuccess: (data) => {
-      toast.success("Product created successfully");
-      // Navigate to the newly created product
-      if (data?.data?.id) {
-        router.push(`/vendor/dashboard/products/${data.data.id}`);
+      if (isVariant) {
+        toast.success("Product variant created successfully");
+        // Navigate back to parent product
+        router.push(`/vendor/dashboard/products/${parentId}`);
+      } else {
+        toast.success("Product created successfully");
+        // Navigate to the newly created product
+        if (data?.data?.id) {
+          router.push(`/vendor/dashboard/products/${data.data.id}`);
+        }
       }
     },
     onError: (error) => {
       console.error("Error creating product:", error);
       toast.error("Failed to create product");
     },
-  });
-  // Pre-fill form with source product data for duplication
+  });  // Pre-fill form with source product data for duplication
   useEffect(() => {
     if (sourceProductData?.data && !isPending) {
       const sourceProduct = sourceProductData.data;
@@ -119,6 +163,23 @@ export const ProductCreatePage = () => {
     }
   }, [sourceProductData, form, isPending]);
 
+  // Pre-fill form with parent product data for variant creation
+  useEffect(() => {
+    if (parentProductData?.data && !isPending) {
+      const parentProduct = parentProductData.data;
+      form.reset({
+        title: "",
+        description: "",
+        price: parentProduct.price,
+        sku: "",
+        category_id: parentProduct.category_id || "",
+        is_active: true,
+        parent_id: parentId || undefined,
+        attribute_value_ids: [],
+      });
+    }
+  }, [parentProductData, form, isPending, parentId]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -128,6 +189,17 @@ export const ProductCreatePage = () => {
   };
 
   const categories: Category[] = categoriesData?.data || [];
+  const parentProduct = parentProductData?.data;
+  const availableAttributes = parentProduct?.attributes || [];
+
+  // Group attributes by name for variant selection
+  const attributeGroups = availableAttributes.reduce((groups, attr) => {
+    if (!groups[attr.name]) {
+      groups[attr.name] = [];
+    }
+    groups[attr.name].push(attr);
+    return groups;
+  }, {} as Record<string, typeof availableAttributes>);
 
   return (
     <div className="flex-col">
@@ -140,10 +212,21 @@ export const ProductCreatePage = () => {
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back
         </Button>
-        
-        <PageHeader
-          title={duplicateFromId ? "Duplicate Product" : "Create New Product"}
-          description={duplicateFromId ? "Create a new product based on an existing one" : "Add a new product to your catalog"}
+          <PageHeader
+          title={
+            isVariant 
+              ? `Create Variant for ${parentProduct?.title || "Product"}` 
+              : duplicateFromId 
+                ? "Duplicate Product" 
+                : "Create New Product"
+          }
+          description={
+            isVariant
+              ? "Create a new variant with different attribute values"
+              : duplicateFromId 
+                ? "Create a new product based on an existing one" 
+                : "Add a new product to your catalog"
+          }
         />
         <Separator />
         
@@ -269,23 +352,67 @@ export const ProductCreatePage = () => {
                         </FormControl>
                         <FormMessage />
                       </FormItem>
-                    )}
-                  />
-                </div>                <div>
+                    )}                  />
+                </div>
+
+                {/* Attribute Selection for Variants */}
+                {isVariant && Object.keys(attributeGroups).length > 0 && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium">Product Attributes</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Select attribute values for this variant
+                      </p>
+                    </div>
+                    
+                    <FormField
+                      control={form.control}
+                      name="attribute_value_ids"
+                      render={({ field }) => (
+                        <div className="space-y-4">
+                          {Object.entries(attributeGroups).map(([attributeName, attributes]) => (
+                            <div key={attributeName} className="space-y-2">
+                              <FormLabel>{attributeName}</FormLabel>
+                              <div className="flex flex-wrap gap-2">
+                                {attributes.map((attr) => (
+                                  <div key={attr.id} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id={attr.id}
+                                      checked={field.value?.includes(attr.id) || false}
+                                      onChange={(e) => {
+                                        const currentValues = field.value || [];
+                                        if (e.target.checked) {
+                                          // Add the attribute value ID
+                                          field.onChange([...currentValues, attr.id]);
+                                        } else {
+                                          // Remove the attribute value ID
+                                          field.onChange(currentValues.filter(id => id !== attr.id));
+                                        }
+                                      }}
+                                      className="rounded border-gray-300"
+                                    />
+                                    <label htmlFor={attr.id} className="text-sm">
+                                      {attr.display_value || attr.value}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    />
+                  </div>
+                )} 
+              <div>
                   <FormLabel>Images</FormLabel>
-                  <ImageUpload
-                    value={imagePreview}
-                    disabled={isPending || isLoadingSource}
-                    onChange={(file) => {
-                      setSelectedImage(file);
-                      if (file) {
-                        const url = URL.createObjectURL(file);
-                        setImagePreview(url);
-                      } else {
-                        setImagePreview("");
-                      }
-                    }}
-                  />
+                    <CustomImageUpload
+                      value={imagePreviews}
+                      disabled={isPending || isLoadingSource}
+                      multiple={true}
+                      onChange={handleImageChange}
+                    />
                 </div>
 
                 <div className="flex justify-end gap-2">
@@ -296,10 +423,9 @@ export const ProductCreatePage = () => {
                     onClick={() => router.back()}
                   >
                     Cancel
-                  </Button>
-                  <Button type="submit" disabled={isPending || isLoadingSource}>
+                  </Button>                  <Button type="submit" disabled={isPending || isLoadingSource || isLoadingParent}>
                     {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {duplicateFromId ? "Create Duplicate" : "Create Product"}
+                    {isVariant ? "Create Variant" : duplicateFromId ? "Create Duplicate" : "Create Product"}
                   </Button>
                 </div>
               </form>

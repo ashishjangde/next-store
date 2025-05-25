@@ -56,10 +56,10 @@ export class ProductCreateDto {  @ApiProperty({ example: 'Mens Cotton T-Shirt' }
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()
+  @Type(()=> Boolean)
   is_active?: boolean;
-    @ApiProperty({ example: 'category-uuid', required: true })
+  @ApiProperty({ example: 'category-uuid', required: true })
   @IsString({ message: 'Category ID must be a valid string' })
-  @IsUUID('4', { message: 'Category ID must be a valid UUID' })
   category_id: string;
 
   @ApiPropertyOptional({ example: 100, description: 'Initial inventory quantity' })
