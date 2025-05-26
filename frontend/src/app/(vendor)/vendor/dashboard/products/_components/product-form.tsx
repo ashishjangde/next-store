@@ -85,7 +85,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
       description: productData?.data?.description || "",
       price: productData?.data?.price || 0,
       sku: productData?.data?.sku || "",
-      category_id: productData?.data?.category_id || "",
+      category_id: productData?.data?.category?.id || "",
       is_active: productData?.data?.is_active ?? true,
     },
   });
@@ -98,7 +98,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
         description: productData.data.description || "",
         price: productData.data.price,
         sku: productData.data.sku || "",
-        category_id: productData.data.category_id,
+        category_id: productData.data.category?.id,
         is_active: productData.data.is_active,
       });
       setImagePreviews(productData.data.images || []);

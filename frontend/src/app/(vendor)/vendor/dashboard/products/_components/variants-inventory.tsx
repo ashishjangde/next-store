@@ -30,12 +30,9 @@ import { Product } from "@/types/product";
 
 interface VariantsInventoryProps {
   product: Product;
-  inventory: {
-    [key: string]: Inventory;
-  };
 }
 
-export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps) => {
+export const VariantsInventory = ({ product }: VariantsInventoryProps) => {
   const queryClient = useQueryClient();  const [variantInventory, setVariantInventory] = useState<Record<string, {
     quantity: number;
     low_stock_threshold: number;
@@ -45,7 +42,8 @@ export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps
     
     if (product.children) {
       product.children.forEach((variant) => {
-        const variantInv = inventory[variant.id];
+        // Use inventory data directly from variant.inventory instead of separate inventory object
+        const variantInv = variant.inventory;
         initialValues[variant.id] = {
           quantity: variantInv?.quantity || 0,
           low_stock_threshold: variantInv?.low_stock_threshold || 5,
@@ -55,29 +53,32 @@ export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps
     }
     
     return initialValues;
-  });
-    // Handle bulk update of all variant inventory
+  });  // Handle individual variant inventory updates
   const { mutate: updateInventories, isPending } = useMutation({
     mutationFn: async () => {
-      // Format the data for the API call
-      const variants = Object.entries(variantInventory).map(([variantId, data]) => ({
-        variantId,
-        inventory: {
+      // Update each variant inventory individually using the regular inventory update API
+      const updatePromises = Object.entries(variantInventory).map(async ([variantId, data]) => {
+        return InventoryActions.updateProductInventory(variantId, {
           quantity: data.quantity,
           low_stock_threshold: data.low_stock_threshold,
           // Exclude track_inventory as it's not in the API
-        }
-      }));
+        });
+      });
       
-      return InventoryActions.updateVariantInventories(product.id, { variants });
+      // Wait for all updates to complete
+      const results = await Promise.all(updatePromises);
+      return results;
     },
     onSuccess: () => {
-      toast.success("Inventory updated successfully");
+      toast.success("All variant inventories updated successfully");
+      // Invalidate product query to refresh variant data
+      queryClient.invalidateQueries({ queryKey: ["product", product.id] });
+      // Also invalidate inventory queries
       queryClient.invalidateQueries({ queryKey: ["inventory", product.id] });
     },
     onError: (error) => {
-      console.error("Error updating inventory:", error);
-      toast.error("Failed to update inventory");
+      console.error("Error updating variant inventories:", error);
+      toast.error("Failed to update some variant inventories");
     },
   });
 
@@ -111,17 +112,7 @@ export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps
     }));
   };
 
-  const variants = product.children || [];  // Function to get variant attribute display
-  const getVariantAttributes = (variant: Product) => {
-    // Check for attributes structure
-    if (variant.attributes && variant.attributes.length > 0) {
-      return variant.attributes
-        .map((attr) => `${attr.name}: ${attr.value}`)
-        .join(", ");
-    }
-    
-    return "-";
-  };
+  const variants = product.children || [];  // Function to get variant category display
 
   // Function to determine stock status
   const getStockStatus = (variantId: string) => {
@@ -151,7 +142,6 @@ export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps
             <TableHeader>
               <TableRow>
                 <TableHead>Variant</TableHead>
-                <TableHead>Attributes</TableHead>
                 <TableHead>Quantity</TableHead>
                 <TableHead>Low Stock Threshold</TableHead>
                 <TableHead>Track Inventory</TableHead>
@@ -179,10 +169,7 @@ export const VariantsInventory = ({ product, inventory }: VariantsInventoryProps
                         <div className="text-xs text-muted-foreground">SKU: {variant.sku}</div>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {getVariantAttributes(variant)}
-                  </TableCell>
+                  </TableCell>              
                   <TableCell>
                     <Input
                       type="number"

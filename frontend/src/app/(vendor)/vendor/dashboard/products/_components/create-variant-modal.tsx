@@ -77,12 +77,14 @@ export const CreateVariantModal = ({
       description: "",
       price: 0,
       sku: "",
-      category_id: parentProduct?.category_id || "",
+      category_id: parentProduct?.category?.id || "",
       parent_id: parentProductId,
       is_active: true,
       attribute_value_ids: [],
     },
-  });  const { mutate: createVariant, isPending } = useMutation({
+  });
+
+  const { mutate: createVariant, isPending } = useMutation({
     mutationFn: (data: FormData) => {
       return ProductActions.createProduct({
         ...data,

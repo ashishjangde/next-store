@@ -35,7 +35,6 @@ export class InventoryRepository {
       return null;
     }
   }
-
   async updateInventory(
     productId: string,
     data: Partial<Omit<Inventory, 'id' | 'product_id'>>
@@ -49,13 +48,86 @@ export class InventoryRepository {
       );
       
       if (inventory) {
+        // Update inventory cache
         await this.redis.set(`inventory:product:${productId}`, inventory);
+        
+        // Invalidate related product caches since inventory is often included with product data
+        await this.invalidateInventoryRelatedCaches(productId);
       }
       
       return inventory;
     } catch (error) {
       this.logger.error(`Error updating inventory: ${error.message}`, error);
       return null;
+    }
+  }
+
+  /**
+   * Invalidate caches related to inventory updates
+   * This includes product caches that might include inventory data
+   */
+  private async invalidateInventoryRelatedCaches(productId: string): Promise<void> {
+    try {
+      // Get product details for cache invalidation
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: { 
+          id: true, 
+          vendor_id: true, 
+          parent_id: true 
+        }
+      });
+
+      if (!product) {
+        this.logger.warn(`Product ${productId} not found for inventory cache invalidation`);
+        return;
+      }
+
+      const cacheKeysToDelete = [
+        // Inventory-specific caches
+        `inventory:product:${productId}`,
+        `inventory:vendor:${product.vendor_id}:include:true`,
+        `inventory:vendor:${product.vendor_id}:include:false`,
+        
+        // Product caches that might include inventory data
+        `product:${product.id}`,
+        `product:id:${product.id}`,
+        
+        // Product cache variations with different include options
+        `product:id:${product.id}:cat:true:attr:true:children:true`,
+        `product:id:${product.id}:cat:true:attr:true:children:false`,
+        `product:id:${product.id}:cat:true:attr:false:children:true`,
+        `product:id:${product.id}:cat:true:attr:false:children:false`,
+        `product:id:${product.id}:cat:false:attr:true:children:true`,
+        `product:id:${product.id}:cat:false:attr:true:children:false`,
+        `product:id:${product.id}:cat:false:attr:false:children:true`,
+        `product:id:${product.id}:cat:false:attr:false:children:false`,
+        
+        // Vendor-specific product caches
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:true:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:true:children:false`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:false:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:false:children:false`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:true:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:true:children:false`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:false:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:false:children:false`
+      ];
+
+      // If this is a variant, also invalidate parent product cache
+      if (product.parent_id) {
+        cacheKeysToDelete.push(
+          `product:variants:${product.parent_id}`,
+          `product:${product.parent_id}`,
+          `product:id:${product.parent_id}`,
+          `inventory:product:${product.parent_id}`
+        );
+      }
+
+      await this.redis.pipelineDel(cacheKeysToDelete);
+      this.logger.log(`Inventory-related cache invalidated for product ${productId}`);
+    } catch (error) {
+      this.logger.error(`Error invalidating inventory-related cache for product ${productId}: ${error.message}`, error);
     }
   }
 

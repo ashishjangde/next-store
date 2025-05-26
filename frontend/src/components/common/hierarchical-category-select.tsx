@@ -123,52 +123,55 @@ export function HierarchicalCategorySelect({
       setSelectedLevel2(value);
     }
   }, [value, selectedLevel2]);
-
   return (
-    <div className="space-y-4">
-      {/* Level 0 Categories */}
-      <div>
-        <Label className="text-sm font-medium">Category (Level 1)</Label>        <Select
-          value={selectedLevel0 || undefined}
-          onValueChange={handleLevel0Change}
-          disabled={disabled || isLoadingRoot}
-        >
-          <SelectTrigger className={error ? "border-red-500" : ""}>
-            <SelectValue placeholder="Select main category" />
-          </SelectTrigger>
-          <SelectContent>
-            {isLoadingRoot ? (
-              <div className="flex items-center justify-center p-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="ml-2">Loading...</span>
-              </div>            ) : (
-              level0Categories
-                .filter(category => category.id && category.id.trim() !== '')
-                .map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  <div className="flex items-center gap-2">
-                    {category.name}
-                    <Badge variant="outline" className="text-xs">
-                      Level 0
-                    </Badge>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Level 1 Categories */}
-      {selectedLevel0 && (
+    <div className="space-y-3">
+      {/* Horizontal Layout for Category Selects */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Level 0 Categories */}
         <div>
-          <Label className="text-sm font-medium">Subcategory (Level 2)</Label>          <Select
-            value={selectedLevel1 || undefined}
-            onValueChange={handleLevel1Change}
-            disabled={disabled || isLoadingLevel1}
+          <Label className="text-sm font-medium">Main Category</Label>
+          <Select
+            value={selectedLevel0 || undefined}
+            onValueChange={handleLevel0Change}
+            disabled={disabled || isLoadingRoot}
           >
             <SelectTrigger className={error ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select subcategory" />
+              <SelectValue placeholder="Select main category" />
+            </SelectTrigger>
+            <SelectContent>
+              {isLoadingRoot ? (
+                <div className="flex items-center justify-center p-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="ml-2">Loading...</span>
+                </div>
+              ) : (
+                level0Categories
+                  .filter(category => category.id && category.id.trim() !== '')
+                  .map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    <div className="flex items-center gap-2">
+                      {category.name}
+                      <Badge variant="outline" className="text-xs">
+                        L0
+                      </Badge>
+                    </div>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Level 1 Categories */}
+        <div>
+          <Label className="text-sm font-medium">Subcategory</Label>
+          <Select
+            value={selectedLevel1 || undefined}
+            onValueChange={handleLevel1Change}
+            disabled={disabled || isLoadingLevel1 || !selectedLevel0}
+          >
+            <SelectTrigger className={error ? "border-red-500" : ""}>
+              <SelectValue placeholder={selectedLevel0 ? "Select subcategory" : "Select main first"} />
             </SelectTrigger>
             <SelectContent>
               {isLoadingLevel1 ? (
@@ -179,7 +182,8 @@ export function HierarchicalCategorySelect({
               ) : level1Categories.length === 0 ? (
                 <div className="p-2 text-sm text-muted-foreground">
                   No subcategories available
-                </div>              ) : (
+                </div>
+              ) : (
                 level1Categories
                   .filter(category => category.id && category.id.trim() !== '')
                   .map((category) => (
@@ -187,7 +191,7 @@ export function HierarchicalCategorySelect({
                     <div className="flex items-center gap-2">
                       {category.name}
                       <Badge variant="outline" className="text-xs">
-                        Level 1
+                        L1
                       </Badge>
                     </div>
                   </SelectItem>
@@ -196,18 +200,17 @@ export function HierarchicalCategorySelect({
             </SelectContent>
           </Select>
         </div>
-      )}
 
-      {/* Level 2 Categories */}
-      {selectedLevel1 && (
+        {/* Level 2 Categories */}
         <div>
-          <Label className="text-sm font-medium">Final Category (Level 3) *</Label>          <Select
+          <Label className="text-sm font-medium">Final Category *</Label>
+          <Select
             value={selectedLevel2 || undefined}
             onValueChange={handleLevel2Change}
-            disabled={disabled || isLoadingLevel2}
+            disabled={disabled || isLoadingLevel2 || !selectedLevel1}
           >
             <SelectTrigger className={error ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select final category" />
+              <SelectValue placeholder={selectedLevel1 ? "Select final category" : "Select subcategory first"} />
             </SelectTrigger>
             <SelectContent>
               {isLoadingLevel2 ? (
@@ -218,7 +221,8 @@ export function HierarchicalCategorySelect({
               ) : level2Categories.length === 0 ? (
                 <div className="p-2 text-sm text-muted-foreground">
                   No final categories available
-                </div>              ) : (
+                </div>
+              ) : (
                 level2Categories
                   .filter(category => category.id && category.id.trim() !== '')
                   .map((category) => (
@@ -226,7 +230,7 @@ export function HierarchicalCategorySelect({
                     <div className="flex items-center gap-2">
                       {category.name}
                       <Badge variant="default" className="text-xs bg-green-600">
-                        Level 2
+                        L2
                       </Badge>
                     </div>
                   </SelectItem>
@@ -234,39 +238,39 @@ export function HierarchicalCategorySelect({
               )}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground mt-1">
-            Only Level 2 categories can be assigned to products
-          </p>
         </div>
-      )}
+      </div>
 
-      {/* Selection Path Display */}
+      {/* Helper Text */}
+      <p className="text-xs text-muted-foreground">
+        Only Level 2 categories can be assigned to products
+      </p>
+
+      {/* Selection Path Display - Compact */}
       {(selectedLevel0 || selectedLevel1 || selectedLevel2) && (
-        <div className="p-3 bg-muted rounded-lg">
-          <Label className="text-xs font-medium text-muted-foreground">Selection Path:</Label>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            {selectedLevel0 && (
-              <>
-                <Badge variant="outline">
-                  {level0Categories.find(cat => cat.id === selectedLevel0)?.name}
-                </Badge>
-                {selectedLevel1 && <span className="text-muted-foreground">→</span>}
-              </>
-            )}
-            {selectedLevel1 && (
-              <>
-                <Badge variant="outline">
-                  {level1Categories.find(cat => cat.id === selectedLevel1)?.name}
-                </Badge>
-                {selectedLevel2 && <span className="text-muted-foreground">→</span>}
-              </>
-            )}
-            {selectedLevel2 && (
-              <Badge variant="default" className="bg-green-600">
-                {level2Categories.find(cat => cat.id === selectedLevel2)?.name}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Label className="text-xs font-medium text-muted-foreground">Path:</Label>
+          {selectedLevel0 && (
+            <>
+              <Badge variant="outline" className="text-xs">
+                {level0Categories.find(cat => cat.id === selectedLevel0)?.name}
               </Badge>
-            )}
-          </div>
+              {selectedLevel1 && <span className="text-muted-foreground">→</span>}
+            </>
+          )}
+          {selectedLevel1 && (
+            <>
+              <Badge variant="outline" className="text-xs">
+                {level1Categories.find(cat => cat.id === selectedLevel1)?.name}
+              </Badge>
+              {selectedLevel2 && <span className="text-muted-foreground">→</span>}
+            </>
+          )}
+          {selectedLevel2 && (
+            <Badge variant="default" className="text-xs bg-green-600">
+              {level2Categories.find(cat => cat.id === selectedLevel2)?.name}
+            </Badge>
+          )}
         </div>
       )}
 

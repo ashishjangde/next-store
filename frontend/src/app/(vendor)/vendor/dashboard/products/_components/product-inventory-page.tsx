@@ -117,7 +117,6 @@ export const ProductInventoryPage = ({ productId }: ProductInventoryPageProps) =
         </div>        {hasVariants ? (
           <VariantsInventory 
             product={product} 
-            inventory={inventory as { [key: string]: Inventory }} 
           />
         ) : (
           <SingleProductInventory 

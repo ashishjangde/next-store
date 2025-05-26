@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import Image from "next/image";
+import { ProductActions as ProductActionsDropdown } from "./product-actions";
 
 interface ProductVariantsListProps {
   productId: string;
@@ -117,7 +118,8 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   Create variants based on attributes like color, size, or material to give your customers options.
                 </p>
-              </div>              <Button onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}>
+              </div>              
+              <Button onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Your First Variant
               </Button>
@@ -149,21 +151,18 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                               className="object-cover" 
                             />
                           </div>
-                        ) : (
-                          <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center text-gray-500 text-xs">
+                        ) : (                          
+                        <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center text-gray-500 text-xs">
                             No image
                           </div>
                         )}
                       </TableCell>                      <TableCell>
                         <div className="font-medium">{variant.title}</div>
                         <div className="text-xs text-muted-foreground">
-                          {/* Show variant attributes if available */}
-                          {variant.attributes?.map((attr, i, arr) => (
-                            <span key={attr.id}>
-                              {attr.name}: {attr.value}
-                              {i < arr.length - 1 ? ", " : ""}
-                            </span>
-                          ))}
+                          {/* Show category instead of attributes */}
+                          {variant.category && (
+                            <span>Category: {variant.category.name}</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>{variant.sku || "-"}</TableCell>
@@ -172,25 +171,9 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                         <Badge variant={variant.is_active ? "default" : "secondary"}>
                           {variant.is_active ? "Active" : "Draft"}
                         </Badge>
-                      </TableCell>
+                      </TableCell>                        
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/vendor/dashboard/products/${variant.id}`)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteVariant(variant.id)}
-                            disabled={isDeleting}
-                          >
-                            Delete
-                          </Button>
-                        </div>
+                        <ProductActionsDropdown product={variant} isVariant={true} />
                       </TableCell>
                     </TableRow>
                   ))}

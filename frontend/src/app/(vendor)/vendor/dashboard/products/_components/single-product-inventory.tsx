@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { InventoryActions } from "@/api-actions/inventory-actions";
-import { inventoryUpdateSchema, type InventoryUpdateInput } from "@/schema/inventory-schema";
+import { type InventoryUpdateInput } from "@/schema/inventory-schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,6 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import { Product } from "@/types/product";
 
 interface SingleProductInventoryProps {
   product: Product;

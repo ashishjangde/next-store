@@ -72,13 +72,37 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
     const indexName = this.getIndexName(index);
     
     try {
+      // Use upsert to create the document if it doesn't exist, or update if it does
       await this.client.update({
         index: indexName,
         id,
-        body: { doc: document },
+        body: { 
+          doc: document,
+          doc_as_upsert: true 
+        },
       });
     } catch (error) {
       this.logger.error(`Error updating document: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  async upsertDocument(index: string, id: string, document: any): Promise<void> {
+    const indexName = this.getIndexName(index);
+    
+    try {
+      // Explicitly upsert: create if doesn't exist, update if it does
+      await this.client.update({
+        index: indexName,
+        id,
+        body: { 
+          doc: document,
+          doc_as_upsert: true 
+        },
+      });
+      this.logger.log(`Document upserted successfully: ${indexName}/${id}`);
+    } catch (error) {
+      this.logger.error(`Error upserting document: ${error.message}`, error);
       throw error;
     }
   }

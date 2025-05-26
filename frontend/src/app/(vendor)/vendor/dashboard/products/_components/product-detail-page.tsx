@@ -28,9 +28,7 @@ interface ProductDetailPageProps {
 
 export const ProductDetailPage = ({ productId }: ProductDetailPageProps) => {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
 
   // Fetch product data with all necessary includes
   const { data: productData, isLoading, error } = useQuery({
@@ -151,7 +149,7 @@ export const ProductDetailPage = ({ productId }: ProductDetailPageProps) => {
 
         <Separator />
 
-        <Tabs defaultValue="overview" className="mt-6" onValueChange={setActiveTab}>
+        <Tabs defaultValue="overview" className="mt-6" >
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="variants">Variants</TabsTrigger>
@@ -272,7 +270,6 @@ export const ProductDetailPage = ({ productId }: ProductDetailPageProps) => {
                   <CardContent>
                     <VariantsInventory 
                       product={product} 
-                      inventory={formattedInventory || {}} 
                     />
                   </CardContent>
                 </Card>

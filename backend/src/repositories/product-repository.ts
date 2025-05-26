@@ -3,9 +3,10 @@ import { Product, Prisma, ProductType } from '@prisma/client';
 import { PrismaService } from 'src/common/db/prisma/prisma.service';
 import { RedisService } from 'src/common/db/redis/redis.service';
 import { ElasticsearchService } from 'src/common/db/elasticsearch/elasticsearch.service';
-import { handleDatabaseOperations } from 'src/common/utils/utils';
+import { handleDatabaseOperations, slugify } from 'src/common/utils/utils';
 import { ProductCreateDto } from 'src/modules/product/dto/product-create.dto';
 import { ProductUpdateDto } from 'src/modules/product/dto/product-update.dto';
+
 
 @Injectable()
 export class ProductRepository {
@@ -16,7 +17,6 @@ export class ProductRepository {
     private redis: RedisService,
     private elasticsearch: ElasticsearchService
   ) {}
-
   private async cacheProduct(product: Product & { children?: Product[] }) {
     // Delete old cache entries first
     await this.redis.pipelineDel([
@@ -35,6 +35,80 @@ export class ProductRepository {
     ]);
   }
 
+  /**
+   * Invalidate all cache entries for a product
+   * Used when product attributes or other data changes
+   */
+  private async invalidateProductCache(productId: string): Promise<void> {
+    try {
+      // Get product details to invalidate related cache entries
+      const product = await this.prisma.product.findUnique({
+        where: { id: productId },
+        select: { 
+          id: true, 
+          slug: true, 
+          vendor_id: true, 
+          parent_id: true 
+        }
+      });
+
+      if (!product) {
+        this.logger.warn(`Product ${productId} not found for cache invalidation`);
+        return;
+      }      // Invalidate all cache entries related to this product
+      const cacheKeysToDelete = [
+        // Direct product cache entries
+        `product:${product.id}`,
+        `product:id:${product.id}`,
+        `product:slug:${product.slug}`,
+        
+        // Product cache entries with different include options
+        `product:id:${product.id}:cat:true:attr:true:children:true`,
+        `product:id:${product.id}:cat:true:attr:true:children:false`,
+        `product:id:${product.id}:cat:true:attr:false:children:true`,
+        `product:id:${product.id}:cat:true:attr:false:children:false`,
+        `product:id:${product.id}:cat:false:attr:true:children:true`,
+        `product:id:${product.id}:cat:false:attr:true:children:false`,
+        `product:id:${product.id}:cat:false:attr:false:children:true`,
+        `product:id:${product.id}:cat:false:attr:false:children:false`,
+        
+        // Vendor-specific cache entries
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:true:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:true:children:false`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:false:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:true:attr:false:children:false`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:true:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:true:children:false`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:false:children:true`,
+        `vendor:${product.vendor_id}:product:${product.id}:cat:false:attr:false:children:false`,
+        
+        // Variants cache
+        `product:variants:${product.id}`,
+        
+        // Vendor products list cache
+        `vendor:products:${product.vendor_id}`,
+        `products:vendor:${product.vendor_id}`,
+        
+        // Inventory-related caches (since product data often includes inventory)
+        `inventory:product:${product.id}`,
+        `inventory:vendor:${product.vendor_id}:include:true`,
+        `inventory:vendor:${product.vendor_id}:include:false`
+      ];      // If this is a variant, also invalidate parent product cache
+      if (product.parent_id) {
+        cacheKeysToDelete.push(
+          `product:variants:${product.parent_id}`,
+          `product:${product.parent_id}`,
+          `product:id:${product.parent_id}`,
+          `inventory:product:${product.parent_id}`
+        );
+      }
+
+      await this.redis.pipelineDel(cacheKeysToDelete);
+      this.logger.log(`Cache invalidated for product ${productId} and related entries`);
+    } catch (error) {
+      this.logger.error(`Error invalidating cache for product ${productId}: ${error.message}`, error);
+    }
+  }
   private async indexProductToElasticsearch(product: any): Promise<void> {
     try {
       // Prepare a clean document for Elasticsearch with only the relevant fields
@@ -57,27 +131,31 @@ export class ProductRepository {
         updated_at: product.updated_at,
       };
 
-      await this.elasticsearch.indexDocument('products', product.id, esDocument);
+      // Use upsert for consistency (though for creation it's the same as index)
+      await this.elasticsearch.upsertDocument('products', product.id, esDocument);
       this.logger.log(`Product ${product.id} (${product.title}) indexed in Elasticsearch`);
     } catch (error) {
       this.logger.error(`Error indexing product to Elasticsearch: ${error.message}`, error);
     }
-  }
-
-  async createProduct(data: ProductCreateDto & { vendor_id: string }): Promise<Product> {
-    const { parent_id, category_id, vendor_id, ...rest } = data;
+  }async createProduct(data: ProductCreateDto & { vendor_id: string }): Promise<Product> {
+    const { parent_id, category_id, vendor_id, initial_quantity, low_stock_threshold, attribute_value_ids, ...rest } = data;
     const product = await this.prisma.product.create({
       data: {
         ...rest,
-        slug: rest.slug || rest.title.toLowerCase().replace(/\s+/g, '-'),
+        slug: slugify(rest.title),
         Vendor: { connect: { id: vendor_id } },
         category: category_id ? { connect: { id: category_id } } : undefined,
         parent: parent_id ? { connect: { id: parent_id } } : undefined,
       },
       include: this.buildIncludeObject(),
-    });
-
-    await this.cacheProduct(product);
+    });    await this.cacheProduct(product);
+    
+    // Invalidate related caches to ensure product listings include the new product
+    await this.performComprehensiveProductCreationCacheInvalidation(product);
+    
+    // Index the new product in Elasticsearch
+    await this.indexProductToElasticsearch(product);
+    
     return product;
   }
 
@@ -430,9 +508,8 @@ export class ProductRepository {
       return null;
     }
   }
-
   async updateProduct(id: string, data: ProductUpdateDto): Promise<Product> {
-    const { parent_id, category_id, ...rest } = data;
+    const { parent_id, category_id, attribute_value_ids, ...rest } = data;
     const product = await this.prisma.product.update({
       where: { id },
       data: {
@@ -441,39 +518,432 @@ export class ProductRepository {
         parent: parent_id ? { connect: { id: parent_id } } : undefined,
       },
       include: this.buildIncludeObject(),
-    });
-
-    await this.cacheProduct(product);
+    });    await this.cacheProduct(product);
+    
+    // Invalidate related caches to ensure product listings reflect the updates
+    await this.performComprehensiveProductUpdateCacheInvalidation(product);
+    
     return product;
   }
-
   async deleteProduct(id: string): Promise<boolean> {
     try {
-      const product = await this.findProductById(id);
-      if (!product) return false;
+      // Get comprehensive product details before deletion for cache invalidation
+      const product = await this.prisma.product.findUnique({
+        where: { id },
+        include: {
+          children: true, // For parent products, get all variants
+          parent: true,   // For variant products, get parent info
+          Inventory: true // Get inventory information
+        }
+      });
 
+      if (!product) {
+        this.logger.warn(`Product ${id} not found for deletion`);
+        return false;
+      }
+
+      // Store necessary data for cache invalidation
+      const productData = {
+        id: product.id,
+        slug: product.slug,
+        vendor_id: product.vendor_id,
+        parent_id: product.parent_id,
+        product_type: product.product_type,
+        children: product.children || [],
+        hasInventory: !!product.Inventory
+      };
+
+      // Perform database deletion
       await handleDatabaseOperations(() =>
         this.prisma.product.delete({
           where: { id }
         }),
       );
 
-      // Remove from cache and Elasticsearch
-      await this.redis.pipelineDel([
-        `product:id:${id}`,
-        `product:slug:${product.slug}`,
-        `product:variants:${product.parent_id}`,
-        `products:vendor:${product.vendor_id}`
-      ]);
+      // Comprehensive cache invalidation
+      await this.performComprehensiveProductDeletionCacheInvalidation(productData);
 
+      // Remove from Elasticsearch
       await this.elasticsearch.deleteDocument('products', id);
 
+      this.logger.log(`Product ${id} (${product.title}) successfully deleted with comprehensive cache invalidation`);
       return true;
     } catch (error) {
-      this.logger.error(`Error deleting product: ${error.message}`, error);
+      this.logger.error(`Error deleting product ${id}: ${error.message}`, error);
       return false;
     }
   }
+  /**
+   * Perform comprehensive cache invalidation when a product is deleted
+   * This handles all related cache entries including variants, inventory, and parent/child relationships
+   */
+  private async performComprehensiveProductDeletionCacheInvalidation(productData: {
+    id: string;
+    slug: string;
+    vendor_id: string;
+    parent_id?: string | null;
+    product_type: string;
+    children: any[];
+    hasInventory: boolean;
+  }): Promise<void> {
+    try {
+      const cacheKeysToDelete: string[] = [];
+
+      // 1. Direct product cache entries
+      cacheKeysToDelete.push(
+        // Basic product caches
+        `product:${productData.id}`,
+        `product:id:${productData.id}`,
+        `product:slug:${productData.slug}`,
+        
+        // Product cache entries with all possible include option combinations
+        `product:id:${productData.id}:cat:true:attr:true:children:true`,
+        `product:id:${productData.id}:cat:true:attr:true:children:false`,
+        `product:id:${productData.id}:cat:true:attr:false:children:true`,
+        `product:id:${productData.id}:cat:true:attr:false:children:false`,
+        `product:id:${productData.id}:cat:false:attr:true:children:true`,
+        `product:id:${productData.id}:cat:false:attr:true:children:false`,
+        `product:id:${productData.id}:cat:false:attr:false:children:true`,
+        `product:id:${productData.id}:cat:false:attr:false:children:false`,
+        
+        // Vendor-specific product caches with all combinations
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:true:attr:true:children:true`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:true:attr:true:children:false`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:true:attr:false:children:true`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:true:attr:false:children:false`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:false:attr:true:children:true`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:false:attr:true:children:false`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:false:attr:false:children:true`,
+        `vendor:${productData.vendor_id}:product:${productData.id}:cat:false:attr:false:children:false`
+      );
+
+      // 2. Inventory-related caches (if product had inventory)
+      if (productData.hasInventory) {
+        cacheKeysToDelete.push(
+          `inventory:product:${productData.id}`,
+          `inventory:vendor:${productData.vendor_id}:include:true`,
+          `inventory:vendor:${productData.vendor_id}:include:false`
+        );
+      }
+
+      // 3. Vendor products list caches
+      cacheKeysToDelete.push(
+        `vendor:products:${productData.vendor_id}`,
+        `products:vendor:${productData.vendor_id}`,
+        `vendor:${productData.vendor_id}:products`
+      );
+
+      // 4. Handle parent-child relationships
+      if (productData.product_type === 'PARENT' && productData.children.length > 0) {
+        // If deleting a parent product, invalidate all variant caches
+        cacheKeysToDelete.push(`product:variants:${productData.id}`);
+        
+        // Invalidate each child variant's cache
+        for (const child of productData.children) {
+          cacheKeysToDelete.push(
+            `product:${child.id}`,
+            `product:id:${child.id}`,
+            `product:slug:${child.slug}`,
+            `inventory:product:${child.id}`
+          );
+        }
+      } else if (productData.parent_id) {
+        // If deleting a variant, invalidate parent's variant list cache
+        cacheKeysToDelete.push(
+          `product:variants:${productData.parent_id}`,
+          `product:${productData.parent_id}`,
+          `product:id:${productData.parent_id}`
+        );
+      }
+
+      // 5. Search and listing caches that might include this product
+      cacheKeysToDelete.push(
+        // Product search caches
+        `search:products:*`,
+        `products:search:*`,
+        
+        // Category-based product listings
+        `category:products:*`,
+        `products:category:*`,
+        
+        // Vendor dashboard product listings
+        `vendor:${productData.vendor_id}:dashboard:products`,
+        `dashboard:products:vendor:${productData.vendor_id}`,
+        
+        // Low stock product caches (if had inventory)
+        ...(productData.hasInventory ? [
+          `inventory:low-stock:*`,
+          `low-stock:products:*`,
+          `vendor:${productData.vendor_id}:low-stock`
+        ] : [])
+      );
+
+      // 6. Product aggregation and statistics caches
+      cacheKeysToDelete.push(
+        `vendor:${productData.vendor_id}:stats`,
+        `vendor:${productData.vendor_id}:product-count`,
+        `product:stats:*`,
+        `analytics:products:*`
+      );
+
+      // Execute cache deletion in batches to avoid memory issues
+      const batchSize = 50;
+      for (let i = 0; i < cacheKeysToDelete.length; i += batchSize) {
+        const batch = cacheKeysToDelete.slice(i, i + batchSize);
+        await this.redis.pipelineDel(batch);
+      }
+
+      // Also clear any pattern-based caches using Redis SCAN and DELETE
+      await this.clearPatternBasedCaches([
+        `*product:${productData.id}*`,
+        `*vendor:${productData.vendor_id}:product*`,
+        `*products:*${productData.id}*`,
+        `*inventory:*${productData.id}*`
+      ]);
+
+      this.logger.log(`Comprehensive cache invalidation completed for deleted product ${productData.id}`);
+    } catch (error) {
+      this.logger.error(`Error in comprehensive cache invalidation for deleted product ${productData.id}: ${error.message}`, error);
+      // Don't throw here as the product deletion already succeeded
+    }
+  }
+
+  /**
+   * Clear caches matching specific patterns using Redis SCAN
+   */
+  private async clearPatternBasedCaches(patterns: string[]): Promise<void> {
+    try {
+      for (const pattern of patterns) {
+        // Use Redis SCAN to find keys matching the pattern
+        const keys = await this.redis.scanKeys(pattern);
+        if (keys.length > 0) {
+          await this.redis.pipelineDel(keys);
+          this.logger.log(`Cleared ${keys.length} cache keys matching pattern: ${pattern}`);
+        }
+      }    } catch (error) {
+      this.logger.error(`Error clearing pattern-based caches: ${error.message}`, error);
+    }
+  }
+
+  /**
+   * Comprehensive cache invalidation for product creation operations
+   * This ensures that all cached product listings are updated to include the new product
+   */
+  private async performComprehensiveProductCreationCacheInvalidation(productData: {
+    id: string;
+    slug: string;
+    vendor_id: string;
+    parent_id?: string | null;
+    product_type: string;
+    category_id?: string | null;
+  }): Promise<void> {
+    try {
+      const cacheKeysToDelete: string[] = [];
+
+      // 1. Vendor products list caches - these need to be invalidated so new product appears in listings
+      cacheKeysToDelete.push(
+        `vendor:products:${productData.vendor_id}`,
+        `products:vendor:${productData.vendor_id}`,
+        `vendor:${productData.vendor_id}:products`,
+        
+        // Vendor dashboard product listings with all possible pagination/filtering combinations
+        `vendor:${productData.vendor_id}:dashboard:products`,
+        `dashboard:products:vendor:${productData.vendor_id}`
+      );      // 2. Parent-child relationship caches
+      if (productData.parent_id) {
+        // If creating a variant, invalidate ALL parent's cache entries since the children relationship has changed
+        cacheKeysToDelete.push(
+          // Basic parent product caches
+          `product:variants:${productData.parent_id}`,
+          `product:${productData.parent_id}`,
+          `product:id:${productData.parent_id}`,
+          
+          // Parent product cache entries with ALL possible include option combinations
+          // These are critical because they contain the children relationship that just changed
+          `product:id:${productData.parent_id}:cat:true:attr:true:children:true`,
+          `product:id:${productData.parent_id}:cat:true:attr:true:children:false`,
+          `product:id:${productData.parent_id}:cat:true:attr:false:children:true`,
+          `product:id:${productData.parent_id}:cat:true:attr:false:children:false`,
+          `product:id:${productData.parent_id}:cat:false:attr:true:children:true`,
+          `product:id:${productData.parent_id}:cat:false:attr:true:children:false`,
+          `product:id:${productData.parent_id}:cat:false:attr:false:children:true`,
+          `product:id:${productData.parent_id}:cat:false:attr:false:children:false`,
+          
+          // Vendor-specific parent product caches with all combinations
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:true:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:true:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:false:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:false:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:true:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:true:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:false:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:false:children:false`
+        );
+      }
+
+      // 3. Category-based product listings (if product has a category)
+      if (productData.category_id) {
+        cacheKeysToDelete.push(
+          `category:products:${productData.category_id}`,
+          `products:category:${productData.category_id}`,
+          `category:${productData.category_id}:products`
+        );
+      }
+
+      // 4. Search and listing caches that should include the new product
+      cacheKeysToDelete.push(
+        // General product search caches
+        `search:products:*`,
+        `products:search:*`,
+        
+        // All category product listings (since we don't know which ones might be cached)
+        `category:products:*`,
+        `products:category:*`,
+        
+        // All products listings
+        `products:all:*`,
+        `all:products:*`
+      );
+
+      // 5. Product aggregation and statistics caches
+      cacheKeysToDelete.push(
+        `vendor:${productData.vendor_id}:stats`,
+        `vendor:${productData.vendor_id}:product-count`,
+        `product:stats:*`,
+        `analytics:products:*`
+      );
+
+      // Execute cache deletion in batches to avoid memory issues
+      const batchSize = 50;
+      for (let i = 0; i < cacheKeysToDelete.length; i += batchSize) {
+        const batch = cacheKeysToDelete.slice(i, i + batchSize);
+        await this.redis.pipelineDel(batch);
+      }
+
+      // Also clear any pattern-based caches using Redis SCAN and DELETE
+      await this.clearPatternBasedCaches([
+        `*vendor:${productData.vendor_id}:products*`,
+        `*vendor:${productData.vendor_id}:parent-products*`,
+        `*products:vendor:${productData.vendor_id}*`,
+        `*dashboard:products*`,
+        ...(productData.category_id ? [`*category:${productData.category_id}:products*`] : []),
+        ...(productData.parent_id ? [`*variants:${productData.parent_id}*`] : [])
+      ]);
+
+      this.logger.log(`Comprehensive cache invalidation completed for created product ${productData.id}`);
+    } catch (error) {
+      this.logger.error(`Error in comprehensive cache invalidation for created product ${productData.id}: ${error.message}`, error);
+      // Don't throw here as the product creation already succeeded
+    }  }
+
+  /**
+   * Comprehensive cache invalidation for product update operations
+   * This ensures that all cached product listings reflect the updated product information
+   */
+  private async performComprehensiveProductUpdateCacheInvalidation(productData: {
+    id: string;
+    slug: string;
+    vendor_id: string;
+    parent_id?: string | null;
+    product_type: string;
+    category_id?: string | null;
+  }): Promise<void> {
+    try {
+      const cacheKeysToDelete: string[] = [];
+
+      // 1. Direct product cache entries (all combinations)
+      cacheKeysToDelete.push(
+        `product:${productData.id}`,
+        `product:id:${productData.id}`,
+        `product:slug:${productData.slug}`,
+        
+        // Product cache entries with all possible include option combinations
+        `product:id:${productData.id}:cat:true:attr:true:children:true`,
+        `product:id:${productData.id}:cat:true:attr:true:children:false`,
+        `product:id:${productData.id}:cat:true:attr:false:children:true`,
+        `product:id:${productData.id}:cat:true:attr:false:children:false`,
+        `product:id:${productData.id}:cat:false:attr:true:children:true`,
+        `product:id:${productData.id}:cat:false:attr:true:children:false`,
+        `product:id:${productData.id}:cat:false:attr:false:children:true`,
+        `product:id:${productData.id}:cat:false:attr:false:children:false`
+      );
+
+      // 2. Vendor products list caches - updates might change sort order or filtering
+      cacheKeysToDelete.push(
+        `vendor:products:${productData.vendor_id}`,
+        `products:vendor:${productData.vendor_id}`,
+        `vendor:${productData.vendor_id}:products`,
+        `vendor:${productData.vendor_id}:dashboard:products`,
+        `dashboard:products:vendor:${productData.vendor_id}`
+      );
+
+      // 3. Parent-child relationship caches
+      if (productData.parent_id) {
+        // If updating a variant, invalidate parent's variant list cache
+        cacheKeysToDelete.push(
+          `product:variants:${productData.parent_id}`,
+          `product:${productData.parent_id}`,
+          `product:id:${productData.parent_id}`
+        );
+      }
+
+      // 4. Category-based product listings (if product has a category)
+      if (productData.category_id) {
+        cacheKeysToDelete.push(
+          `category:products:${productData.category_id}`,
+          `products:category:${productData.category_id}`,
+          `category:${productData.category_id}:products`
+        );
+      }
+
+      // 5. Search and listing caches that might be affected by the update
+      cacheKeysToDelete.push(
+        // General product search caches
+        `search:products:*`,
+        `products:search:*`,
+        
+        // All category product listings
+        `category:products:*`,
+        `products:category:*`,
+        
+        // All products listings
+        `products:all:*`,
+        `all:products:*`
+      );
+
+      // 6. Product aggregation and statistics caches
+      cacheKeysToDelete.push(
+        `vendor:${productData.vendor_id}:stats`,
+        `vendor:${productData.vendor_id}:product-count`,
+        `product:stats:*`,
+        `analytics:products:*`
+      );
+
+      // Execute cache deletion in batches
+      const batchSize = 50;
+      for (let i = 0; i < cacheKeysToDelete.length; i += batchSize) {
+        const batch = cacheKeysToDelete.slice(i, i + batchSize);
+        await this.redis.pipelineDel(batch);
+      }
+
+      // Also clear any pattern-based caches using Redis SCAN and DELETE
+      await this.clearPatternBasedCaches([
+        `*product:${productData.id}*`,
+        `*vendor:${productData.vendor_id}:products*`,
+        `*vendor:${productData.vendor_id}:parent-products*`,
+        `*products:vendor:${productData.vendor_id}*`,
+        `*dashboard:products*`,
+        ...(productData.category_id ? [`*category:${productData.category_id}:products*`] : []),
+        ...(productData.parent_id ? [`*variants:${productData.parent_id}*`] : [])
+      ]);
+
+      this.logger.log(`Comprehensive cache invalidation completed for updated product ${productData.id}`);
+    } catch (error) {
+      this.logger.error(`Error in comprehensive cache invalidation for updated product ${productData.id}: ${error.message}`, error);
+      // Don't throw here as the product update already succeeded
+    }
+  }
+
   async addAttributeToProduct(productId: string, attributeValueId: string): Promise<any | null> {
     try {
       const result = await handleDatabaseOperations(() =>
@@ -496,6 +966,9 @@ export class ProductRepository {
       if (result) {
         // Update product in Elasticsearch
         await this.updateProductInElasticsearch(productId);
+        
+        // Invalidate Redis cache for the product
+        await this.invalidateProductCache(productId);
       }
 
       return result;
@@ -504,7 +977,6 @@ export class ProductRepository {
       return null;
     }
   }
-
   async removeAttributeFromProduct(productId: string, attributeValueId: string): Promise<boolean> {
     try {
       const result = await handleDatabaseOperations(() =>
@@ -519,6 +991,9 @@ export class ProductRepository {
       if (result && result.count > 0) {
         // Update product in Elasticsearch
         await this.updateProductInElasticsearch(productId);
+        
+        // Invalidate Redis cache for the product
+        await this.invalidateProductCache(productId);
         return true;
       }
 
@@ -654,7 +1129,6 @@ export class ProductRepository {
       totalPages: Math.ceil(total / pageSize)
     };
   }
-
   private async updateProductInElasticsearch(productId: string): Promise<void> {
     try {
       const product = await this.findProductById(
@@ -685,8 +1159,11 @@ export class ProductRepository {
           updated_at: product.updated_at,
         };
 
-        await this.elasticsearch.updateDocument('products', productId, esDocument);
-        this.logger.log(`Product ${product.id} (${product.title}) updated in Elasticsearch`);
+        // Use upsert to handle cases where document doesn't exist in Elasticsearch
+        await this.elasticsearch.upsertDocument('products', productId, esDocument);
+        this.logger.log(`Product ${product.id} (${product.title}) updated/created in Elasticsearch`);
+      } else {
+        this.logger.warn(`Product ${productId} not found in database, skipping Elasticsearch update`);
       }
     } catch (error) {
       this.logger.error(`Error updating product in Elasticsearch: ${error.message}`, error);

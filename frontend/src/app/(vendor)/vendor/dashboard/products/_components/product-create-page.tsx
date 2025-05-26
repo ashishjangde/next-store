@@ -36,38 +36,37 @@ import { CategoryActions } from "@/api-actions/categories-actions";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { HierarchicalCategorySelect } from "@/components/common/hierarchical-category-select";
 import CustomImageUpload from "@/components/common/custom-image-upload";
-
-
-type Category = {
-  id: string;
-  name: string;
-};
+import { Checkbox } from "@/components/ui/checkbox";
 
 type FormData = {
   title: string;
   description: string;
   price: number;
-  sku?: string;
   category_id: string;
   is_active: boolean;
-  parent_id?: string; // Add parent_id for variants
-  attribute_value_ids?: string[]; // Add attribute values for variants
+  parent_id?: string;
+  brand?: string;
+  season?: string;
+  weight?: number;
+  initial_quantity?: number;
+  low_stock_threshold?: number;
+  attribute_value_ids?: string[]; 
 };
 
 export const ProductCreatePage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const duplicateFromId = searchParams.get("duplicate");
-    // Use nuqs for parent_id query parameter
-  const [parentId] = useQueryState("parent_id", parseAsString);
-  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const updateProductId = searchParams.get("update");
+  const [parentId] = useQueryState("parent_id", parseAsString);  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   
   const isVariant = !!parentId;
+  const isUpdate = !!updateProductId;
     // Handle image changes with proper cleanup
   const handleImageChange = useCallback((files: File[] | File | null) => {
-    // Use flushSync for React 19 compatibility
     flushSync(() => {
       if (Array.isArray(files)) {
         setSelectedImages(files);
@@ -83,16 +82,19 @@ export const ProductCreatePage = () => {
       }
     });
   }, []);
-  
   const form = useForm<FormData>({
     defaultValues: {
       title: "",
       description: "",
       price: 0,
-      sku: "",
       category_id: "",
       is_active: true,
-      parent_id: parentId || undefined,
+      parent_id: parentId || "",
+      brand: "",
+      season: "",
+      weight: 0,
+      initial_quantity: 0,
+      low_stock_threshold: 0,
       attribute_value_ids: [],
     },
   });// Fetch categories
@@ -102,7 +104,19 @@ export const ProductCreatePage = () => {
       return await CategoryActions.getRootCategories();
     },
     staleTime: 60000, // 1 minute
+  });  // If updating, fetch product data to edit
+  const { data: updateProductData, isLoading: isLoadingUpdate } = useQuery({
+    queryKey: ["update-product", updateProductId],
+    queryFn: async () => {
+      if (!updateProductId) return null;
+      return await ProductActions.getProductById(updateProductId, {
+        include_attributes: true,
+        include_category: true,
+      });
+    },
+    enabled: !!updateProductId && mounted,
   });
+
   // If duplicating, fetch source product data
   const { data: sourceProductData, isLoading: isLoadingSource } = useQuery({
     queryKey: ["source-product", duplicateFromId],
@@ -112,7 +126,6 @@ export const ProductCreatePage = () => {
     },
     enabled: !!duplicateFromId && mounted,
   });
-
   // If creating a variant, fetch parent product data
   const { data: parentProductData, isLoading: isLoadingParent } = useQuery({
     queryKey: ["parent-product", parentId],
@@ -120,19 +133,40 @@ export const ProductCreatePage = () => {
       if (!parentId) return null;
       return await ProductActions.getProductById(parentId, {
         include_attributes: true,
+        include_category: true,
       });
     },
     enabled: !!parentId && mounted,
-  });  // Create product mutation
+  });
+
+  // Fetch category attributes when category is selected
+  const { data: categoryAttributesData, isLoading: isLoadingAttributes } = useQuery({
+    queryKey: ["category-attributes", selectedCategoryId],
+    queryFn: async () => {
+      if (!selectedCategoryId) return null;
+      return await CategoryActions.getCategoryById(selectedCategoryId, false, true);
+    },
+    enabled: !!selectedCategoryId && mounted,
+  });// Create/Update product mutation
   const { mutate: createProduct, isPending } = useMutation({
     mutationFn: (data: FormData) => {
-      return ProductActions.createProduct({
-        ...data,
-        images: selectedImages,
-      });
+      if (isUpdate && updateProductId) {
+        return ProductActions.updateProduct(updateProductId, {
+          ...data,
+          images: selectedImages,
+        });
+      } else {
+        return ProductActions.createProduct({
+          ...data,
+          images: selectedImages,
+        });
+      }
     },
     onSuccess: (data) => {
-      if (isVariant) {
+      if (isUpdate) {
+        toast.success("Product updated successfully");
+        router.push(`/vendor/dashboard/products/${updateProductId}`);
+      } else if (isVariant) {
         toast.success("Product variant created successfully");
         // Navigate back to parent product
         router.push(`/vendor/dashboard/products/${parentId}`);
@@ -145,38 +179,86 @@ export const ProductCreatePage = () => {
       }
     },
     onError: (error) => {
-      console.error("Error creating product:", error);
-      toast.error("Failed to create product");
+      console.error("Error creating/updating product:", error);
+      toast.error(isUpdate ? "Failed to update product" : "Failed to create product");
     },
-  });  // Pre-fill form with source product data for duplication
+  });  // Pre-fill form with product data for updating
+  useEffect(() => {
+    if (updateProductData?.data && !isPending) {
+      const updateProduct = updateProductData.data;
+      form.reset({
+        title: updateProduct.title || "",
+        description: updateProduct.description || "",
+        price: updateProduct.price || 0,
+        category_id: updateProduct.category?.id || "",
+        is_active: updateProduct.is_active ?? true,
+        parent_id: updateProduct.parent_id || "",
+        brand: updateProduct.brand || "",
+        season: updateProduct.season || "",
+        weight: updateProduct.weight || 0,
+        initial_quantity: updateProduct.inventory?.quantity || 0,
+        low_stock_threshold: updateProduct.inventory?.low_stock_threshold || 0,
+        attribute_value_ids: updateProduct.attributes?.map(attr => attr.id) || [],
+      });
+
+      // Set selected category for attributes
+      if (updateProduct.category?.id) {
+        setSelectedCategoryId(updateProduct.category.id);
+      }
+
+      // Set existing images if available
+      if (updateProduct.images && updateProduct.images.length > 0) {
+        setImagePreviews(updateProduct.images);
+        // Note: For existing images, we don't set selectedImages as they're already uploaded
+      }
+    }
+  }, [updateProductData, form, isPending]);  // Pre-fill form with source product data for duplication
   useEffect(() => {
     if (sourceProductData?.data && !isPending) {
       const sourceProduct = sourceProductData.data;
       form.reset({
         title: `Copy of ${sourceProduct.title}`,
         description: sourceProduct.description || "",
-        price: sourceProduct.price,
-        sku: `${sourceProduct.sku || ""}-COPY`,
-        category_id: sourceProduct.category_id || "",
-        is_active: sourceProduct.is_active,
+        price: sourceProduct.price || 0,
+        category_id: sourceProduct.category?.id || "",
+        is_active: sourceProduct.is_active ?? true,
+        brand: sourceProduct.brand || "",
+        season: sourceProduct.season || "",
+        weight: sourceProduct.weight || 0,
+        initial_quantity: sourceProduct.inventory?.quantity || 0,
+        low_stock_threshold: sourceProduct.inventory?.low_stock_threshold || 0,
+        attribute_value_ids: [],
       });
-    }
-  }, [sourceProductData, form, isPending]);
 
-  // Pre-fill form with parent product data for variant creation
+      // Set selected category for attributes
+      if (sourceProduct.category?.id) {
+        setSelectedCategoryId(sourceProduct.category.id);
+      }
+    }
+  }, [sourceProductData, form, isPending]);  // Pre-fill form with parent product data for variant creation
   useEffect(() => {
     if (parentProductData?.data && !isPending) {
       const parentProduct = parentProductData.data;
+      console.log("Parent Product Data:", parentProduct);
       form.reset({
-        title: "",
-        description: "",
-        price: parentProduct.price,
-        sku: "",
-        category_id: parentProduct.category_id || "",
+        title: (parentProduct.title || "") + " Variant",
+        description: parentProduct.description || "",
+        price: parentProduct.price || 0,
+        category_id: parentProduct.category?.id || "",
         is_active: true,
-        parent_id: parentId || undefined,
-        attribute_value_ids: [],
+        parent_id: parentId || "",
+        brand: parentProduct.brand || "",
+        season: parentProduct.season || "",
+        weight: parentProduct.weight || 0,
+        initial_quantity: parentProduct.inventory?.quantity || 0,
+        low_stock_threshold: parentProduct.inventory?.low_stock_threshold || 0,        // For variants, pre-populate with parent's attribute values for easy modification
+        attribute_value_ids: parentProduct.attributes?.map(attr => attr.id) || [],
       });
+
+      // Set selected category for attributes
+      if (parentProduct.category?.id) {
+        setSelectedCategoryId(parentProduct.category.id);
+      }
     }
   }, [parentProductData, form, isPending, parentId]);
 
@@ -188,18 +270,8 @@ export const ProductCreatePage = () => {
     createProduct(data);
   };
 
-  const categories: Category[] = categoriesData?.data || [];
   const parentProduct = parentProductData?.data;
-  const availableAttributes = parentProduct?.attributes || [];
 
-  // Group attributes by name for variant selection
-  const attributeGroups = availableAttributes.reduce((groups, attr) => {
-    if (!groups[attr.name]) {
-      groups[attr.name] = [];
-    }
-    groups[attr.name].push(attr);
-    return groups;
-  }, {} as Record<string, typeof availableAttributes>);
 
   return (
     <div className="flex-col">
@@ -211,21 +283,24 @@ export const ProductCreatePage = () => {
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back
-        </Button>
-          <PageHeader
+        </Button>          <PageHeader
           title={
-            isVariant 
-              ? `Create Variant for ${parentProduct?.title || "Product"}` 
-              : duplicateFromId 
-                ? "Duplicate Product" 
-                : "Create New Product"
+            isUpdate
+              ? `Update Product`
+              : isVariant 
+                ? `Create Variant for ${parentProduct?.title || "Product"}` 
+                : duplicateFromId 
+                  ? "Duplicate Product" 
+                  : "Create New Product"
           }
           description={
-            isVariant
-              ? "Create a new variant with different attribute values"
-              : duplicateFromId 
-                ? "Create a new product based on an existing one" 
-                : "Add a new product to your catalog"
+            isUpdate
+              ? "Update product information and settings"
+              : isVariant
+                ? "Create a new variant with different attribute values"
+                : duplicateFromId 
+                  ? "Create a new product based on an existing one" 
+                  : "Add a new product to your catalog"
           }
         />
         <Separator />
@@ -233,8 +308,7 @@ export const ProductCreatePage = () => {
         <Card>
           <CardContent className="pt-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <FormField
                     control={form.control}
                     name="title"
@@ -243,7 +317,7 @@ export const ProductCreatePage = () => {
                         <FormLabel>Title</FormLabel>
                         <FormControl>
                           <Input
-                            disabled={isPending || isLoadingSource}
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
                             placeholder="Product name"
                             {...field}
                           />
@@ -255,14 +329,14 @@ export const ProductCreatePage = () => {
 
                   <FormField
                     control={form.control}
-                    name="sku"
+                    name="brand"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>SKU (Optional)</FormLabel>
+                        <FormLabel>Brand (Optional)</FormLabel>
                         <FormControl>
                           <Input
-                            disabled={isPending || isLoadingSource}
-                            placeholder="Stock keeping unit"
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                            placeholder="Brand name"
                             {...field}
                           />
                         </FormControl>
@@ -270,9 +344,7 @@ export const ProductCreatePage = () => {
                       </FormItem>
                     )}
                   />
-                </div>
-
-                <FormField
+                </div>                <FormField
                   control={form.control}
                   name="description"
                   render={({ field }) => (
@@ -280,7 +352,7 @@ export const ProductCreatePage = () => {
                       <FormLabel>Description</FormLabel>
                       <FormControl>
                         <Textarea
-                          disabled={isPending || isLoadingSource}
+                          disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
                           placeholder="Product description"
                           className="resize-none min-h-[120px]"
                           {...field}
@@ -291,7 +363,80 @@ export const ProductCreatePage = () => {
                   )}
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <FormField
+                    control={form.control}
+                    name="season"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Season (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                            placeholder="e.g., Summer, Winter, All Season"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />                  <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weight (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                            placeholder="Weight in grams"
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '') {
+                                field.onChange(0);
+                              } else {
+                                const numValue = parseFloat(value);
+                                field.onChange(isNaN(numValue) ? 0 : numValue);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>                {/* Category Selection - Full width on its own row */}
+                {!isUpdate && !isVariant && !duplicateFromId && (
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="category_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <FormControl>
+                            <HierarchicalCategorySelect
+                              value={field.value}
+                              onChange={(categoryId) => {
+                                field.onChange(categoryId || "");
+                                setSelectedCategoryId(categoryId || "");
+                              }}
+                              disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                              placeholder="Select a category"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                {/* Price and Status - 2 column layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <FormField
                     control={form.control}
                     name="price"
@@ -301,34 +446,25 @@ export const ProductCreatePage = () => {
                         <FormControl>
                           <Input
                             type="number"
-                            disabled={isPending || isLoadingSource}
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
                             placeholder="0.00"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Allow empty string for deletion, otherwise parse the number
+                              if (value === '') {
+                                field.onChange(0);
+                              } else {
+                                const numValue = parseFloat(value);
+                                field.onChange(isNaN(numValue) ? 0 : numValue);
+                              }
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
-                  />                  <FormField
-                    control={form.control}
-                    name="category_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <FormControl>
-                          <HierarchicalCategorySelect
-                            value={field.value}
-                            onChange={(categoryId) => field.onChange(categoryId || "")}
-                            disabled={isPending || isLoadingSource}
-                            placeholder="Select a category"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
+                  />                 
                   <FormField
                     control={form.control}
                     name="is_active"
@@ -337,7 +473,7 @@ export const ProductCreatePage = () => {
                         <FormLabel>Status</FormLabel>
                         <FormControl>
                           <Select
-                            disabled={isPending || isLoadingSource}
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
                             value={field.value ? "true" : "false"}
                             onValueChange={(value) => field.onChange(value === "true")}
                           >
@@ -352,80 +488,165 @@ export const ProductCreatePage = () => {
                         </FormControl>
                         <FormMessage />
                       </FormItem>
-                    )}                  />
-                </div>
+                    )}
+                  />                
+                  </div>                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <FormField
+                    control={form.control}
+                    name="initial_quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Initial Quantity (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                            placeholder="Initial inventory quantity"
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '') {
+                                field.onChange(0);
+                              } else {
+                                const numValue = parseInt(value);
+                                field.onChange(isNaN(numValue) ? 0 : numValue);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                {/* Attribute Selection for Variants */}
-                {isVariant && Object.keys(attributeGroups).length > 0 && (
-                  <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="low_stock_threshold"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Low Stock Threshold (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                            placeholder="Threshold for low stock alerts"
+                            value={field.value || ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (value === '') {
+                                field.onChange(0);
+                              } else {
+                                const numValue = parseInt(value);
+                                field.onChange(isNaN(numValue) ? 0 : numValue);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />                </div>
+
+                {/* Category Attributes */}
+                {selectedCategoryId && categoryAttributesData?.data?.attributes && (
+                  <div className="space-y-4">
                     <div>
-                      <h3 className="text-lg font-medium">Product Attributes</h3>
+                      <FormLabel className="text-base font-semibold">Product Attributes</FormLabel>
                       <p className="text-sm text-muted-foreground">
-                        Select attribute values for this variant
+                        Select attribute values for this product category
                       </p>
                     </div>
-                    
-                    <FormField
-                      control={form.control}
-                      name="attribute_value_ids"
-                      render={({ field }) => (
-                        <div className="space-y-4">
-                          {Object.entries(attributeGroups).map(([attributeName, attributes]) => (
-                            <div key={attributeName} className="space-y-2">
-                              <FormLabel>{attributeName}</FormLabel>
-                              <div className="flex flex-wrap gap-2">
-                                {attributes.map((attr) => (
-                                  <div key={attr.id} className="flex items-center space-x-2">
-                                    <input
-                                      type="checkbox"
-                                      id={attr.id}
-                                      checked={field.value?.includes(attr.id) || false}
-                                      onChange={(e) => {
-                                        const currentValues = field.value || [];
-                                        if (e.target.checked) {
-                                          // Add the attribute value ID
-                                          field.onChange([...currentValues, attr.id]);
-                                        } else {
-                                          // Remove the attribute value ID
-                                          field.onChange(currentValues.filter(id => id !== attr.id));
-                                        }
-                                      }}
-                                      className="rounded border-gray-300"
-                                    />
-                                    <label htmlFor={attr.id} className="text-sm">
-                                      {attr.display_value || attr.value}
-                                    </label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    />
+                    {isLoadingAttributes ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Loading attributes...</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {categoryAttributesData.data.attributes.map((categoryAttribute: any) => (
+                          <FormField
+                            key={categoryAttribute.attribute.id}
+                            control={form.control}
+                            name="attribute_value_ids"
+                            render={({ field }) => (
+                              <FormItem>
+                                <div className="mb-4">
+                                  <FormLabel className="text-base">
+                                    {categoryAttribute.attribute.name}
+                                    {categoryAttribute.required && (
+                                      <span className="text-red-500 ml-1">*</span>
+                                    )}
+                                  </FormLabel>
+                                  {categoryAttribute.attribute.description && (
+                                    <p className="text-sm text-muted-foreground">
+                                      {categoryAttribute.attribute.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                  {categoryAttribute.attribute.values.map((value: any) => (
+                                    <div key={value.id} className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`attr-${value.id}`}
+                                        checked={field.value?.includes(value.id) || false}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            field.onChange([...(field.value || []), value.id]);
+                                          } else {
+                                            field.onChange(
+                                              field.value?.filter((id) => id !== value.id) || []
+                                            );
+                                          }
+                                        }}
+                                        disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
+                                      />
+                                      <label
+                                        htmlFor={`attr-${value.id}`}
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                      >
+                                        {value.display_value}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )} 
+                )}
+
               <div>
-                  <FormLabel>Images</FormLabel>
-                    <CustomImageUpload
+                <FormLabel>Images</FormLabel>                    
+                <CustomImageUpload
                       value={imagePreviews}
-                      disabled={isPending || isLoadingSource}
+                      disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
                       multiple={true}
                       onChange={handleImageChange}
                     />
                 </div>
 
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2">                  
                   <Button 
                     type="button" 
                     variant="outline" 
-                    disabled={isPending || isLoadingSource}
+                    disabled={isPending || isLoadingSource || isLoadingUpdate || isLoadingParent}
                     onClick={() => router.back()}
                   >
                     Cancel
-                  </Button>                  <Button type="submit" disabled={isPending || isLoadingSource || isLoadingParent}>
+                  </Button>
+                  <Button type="submit" disabled={isPending || isLoadingSource || isLoadingParent || isLoadingUpdate}>
                     {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isVariant ? "Create Variant" : duplicateFromId ? "Create Duplicate" : "Create Product"}
+                    {isUpdate 
+                      ? "Update Product" 
+                      : isVariant 
+                        ? "Create Variant" 
+                        : duplicateFromId 
+                          ? "Create Duplicate" 
+                          : "Create Product"}
                   </Button>
                 </div>
               </form>

@@ -7,7 +7,7 @@ import { Prisma, ProductType } from '@prisma/client';
 import ApiError from 'src/common/responses/ApiError';
 import { plainToClass } from 'class-transformer';
 import { ProductResponseDto, ProductListResponseDto } from './dto/product-response.dto';
-import { slugify } from 'src/common/utils/utils';
+import { generateSKU, slugify } from 'src/common/utils/utils';
 import { ProductCreateDto } from './dto/product-create.dto';
 import { ProductUpdateDto } from './dto/product-update.dto';
 
@@ -54,8 +54,8 @@ export class ProductService {
         if (parentProduct.vendor_id !== vendorId) {
           throw new ApiError(HttpStatus.FORBIDDEN, 'Cannot create variant for another vendor\'s product');
         }
-      }      // Generate slug if not provided
-      const slug = createDto.slug || slugify(createDto.title);
+      }     
+      const slug = slugify(createDto.title);
 
       // Handle file uploads
       let imageUrls: string[] = [];
@@ -82,23 +82,26 @@ export class ProductService {
         } catch (error) {
           throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload product images');
         }
-      }      // Prepare product data
-      const productData: Prisma.ProductCreateInput = {
+      }   
+
+      const sku = generateSKU({ brand: createDto.brand, categoryId: createDto.category_id, title: createDto.title, parentId: createDto.parent_id });
+      
+      const productData = {
         title: createDto.title,
         description: createDto.description,
         slug,
-        sku: createDto.sku,
+        sku: sku,
         price: createDto.price,
         brand: createDto.brand,
         season: createDto.season,
         weight: createDto.weight,
-        product_type: productType, // Use automatically determined product type based on parent_id
+        product_type: productType,
         images: imageUrls,
-        Vendor: { connect: { id: vendorId } }, // Always use the vendor ID from the authenticated user
-        category: { connect: { id: createDto.category_id } },
-        ...(createDto.parent_id && {
-          parent: { connect: { id: createDto.parent_id } }
-        })
+        is_active: createDto.is_active,
+        vendor_id: vendorId,
+        category_id: createDto.category_id,
+        parent_id: createDto.parent_id,
+        attribute_value_ids: createDto.attribute_value_ids
       };
 
       const product = await this.productRepo.createProduct(productData);
@@ -331,14 +334,8 @@ export class ProductService {
       let imageUrls = existingProduct.images;
       if (files && files.length > 0) {
         try {
-          const multerOptions = this.multerS3Service.createMulterOptions('productImages');
-          
-          // Delete old images
-          for (const oldImage of existingProduct.images) {
-            await this.multerS3Service.deleteFile(oldImage);
-          }
-
-          imageUrls = [];
+          const multerOptions = this.multerS3Service.createMulterOptions('productImages');          // Keep existing images and add new ones
+          const newImageUrls: string[] = [];
           for (const file of files) {
             const fileInfo = await new Promise((resolve, reject) => {
               multerOptions.storage._handleFile(
@@ -352,21 +349,55 @@ export class ProductService {
             });
             
             if (fileInfo) {
-              imageUrls.push((fileInfo as any).url);
+              newImageUrls.push((fileInfo as any).url);
             }
           }
+          
+          // Append new images to existing ones
+          imageUrls = [...existingProduct.images, ...newImageUrls];
         } catch (error) {
           throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to upload product images');
-        }
-      }
+        }      }      // Extract inventory-related fields and attribute_value_ids from updateDto
+      const { initial_quantity, low_stock_threshold, attribute_value_ids, ...productUpdateData } = updateDto;
 
-      const updateData: Prisma.ProductUpdateInput = {
-        ...updateDto,
+      const updateData = {
+        ...productUpdateData,
         images: imageUrls,
         ...(updateDto.title && { slug: slugify(updateDto.title) })
       };
 
       const updatedProduct = await this.productRepo.updateProduct(productId, updateData);
+
+      // Update inventory if inventory fields are provided
+      if (initial_quantity !== undefined || low_stock_threshold !== undefined) {
+        const inventoryUpdateData: any = {};
+        if (initial_quantity !== undefined) {
+          inventoryUpdateData.quantity = initial_quantity;
+        }
+        if (low_stock_threshold !== undefined) {
+          inventoryUpdateData.low_stock_threshold = low_stock_threshold;
+        }
+        
+        await this.inventoryRepo.updateInventory(productId, inventoryUpdateData);
+      }
+
+      // Update attributes if attribute_value_ids is provided
+      if (attribute_value_ids !== undefined && Array.isArray(attribute_value_ids)) {
+        // For simplicity, we'll remove all existing attributes and add the new ones
+        // First, get existing attributes
+        const productWithAttributes = await this.productRepo.findProductById(productId, false, true, false);
+        if (productWithAttributes?.attributeValues) {
+          // Remove existing attributes
+          for (const attrValue of productWithAttributes.attributeValues) {
+            await this.productRepo.removeAttributeFromProduct(productId, attrValue.attributeValue.id);
+          }
+        }
+        
+        // Add new attributes
+        for (const attributeValueId of attribute_value_ids) {
+          await this.productRepo.addAttributeToProduct(productId, attributeValueId);
+        }
+      }
       if (!updatedProduct) {
         throw new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Failed to update product');
       }
@@ -653,11 +684,9 @@ export class ProductService {
         low_stock_threshold: product.Inventory.low_stock_threshold,
         reserved_quantity: product.Inventory.reserved_quantity
       };
-    }
-
-    if (product.attributeValues) {
+    }    if (product.attributeValues) {
       transformed['attributes'] = product.attributeValues.map((av: any) => ({
-        id: av.attributeValue.attribute.id,
+        id: av.attributeValue.id,
         name: av.attributeValue.attribute.name,
         value: av.attributeValue.value,
         display_value: av.attributeValue.display_value

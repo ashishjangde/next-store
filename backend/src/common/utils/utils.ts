@@ -75,3 +75,25 @@ export function slugify(text: string): string {
     .replace(/^-+/, '')          // Trim - from start of text
     .replace(/-+$/, '');         // Trim - from end of text
 }
+
+
+
+export function generateSKU({
+  brand,
+  categoryId,
+  title,
+  parentId,
+}: {
+  brand?: string;
+  categoryId: string;
+  title: string;
+  parentId?: string;
+}): string {
+  const prefix = brand?.slice(0, 3).toUpperCase() || 'GEN';
+  const category = categoryId.slice(0, 4).toUpperCase(); // First 4 chars of UUID
+  const titleCode = title.replace(/\s+/g, '').slice(0, 5).toUpperCase(); // First 5 chars of cleaned title
+  const parentCode = parentId ? parentId.slice(0, 3).toUpperCase() : 'XXX';
+  const randomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+
+  return `${prefix}-${category}-${titleCode}-${parentCode}-${randomCode}`;
+}

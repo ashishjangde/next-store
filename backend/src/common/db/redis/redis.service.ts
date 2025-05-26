@@ -87,11 +87,32 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     await pipeline.exec();
   }
-
   async pipelineDel(keys: string[]): Promise<void> {
     if (keys.length === 0) return;
     const pipeline = this.client.pipeline();
     keys.forEach(key => pipeline.del(key));
     await pipeline.exec();
+  }
+
+  /**
+   * Scan for keys matching a pattern using Redis SCAN command
+   * This is more efficient than KEYS command for large datasets
+   */
+  async scanKeys(pattern: string): Promise<string[]> {
+    try {
+      const keys: string[] = [];
+      let cursor = '0';
+      
+      do {
+        const result = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = result[0];
+        keys.push(...result[1]);
+      } while (cursor !== '0');
+      
+      return keys;
+    } catch (error) {
+      this.logger.error(`Error scanning keys with pattern ${pattern}: ${error.message}`, error);
+      return [];
+    }
   }
 }

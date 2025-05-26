@@ -26,6 +26,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { X, Loader2 } from "lucide-react";
+import { Product } from "@/types/product";
 
 interface ProductAttributesFormProps {
   product: Product;
@@ -63,16 +64,16 @@ export const ProductAttributesForm = ({ product }: ProductAttributesFormProps) =
 
   // Fetch category attributes
   const { data: categoryData, isLoading: isLoadingCategory } = useQuery({
-    queryKey: ["category", product.category_id],
+    queryKey: ["category", product.category?.id],
     queryFn: async () => {
       const response = await CategoryActions.getCategoryById(
-        product.category_id,
+        product.category?.id!,
         false,
         true // includeAttributes
       );
       return response.data;
     },
-    enabled: !!product.category_id,
+    enabled: !!product.category?.id, // Only run if category ID is available
   });
 
   // Get category attributes

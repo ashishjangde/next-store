@@ -9,6 +9,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import Image from "next/image";
 import { ProductActions } from "./product-actions";
+import { Product } from "@/types/product";
 
 export const ProductColumns: ColumnDef<Product>[] = [
   {
@@ -99,9 +100,34 @@ export const ProductColumns: ColumnDef<Product>[] = [
     ),
     cell: ({ row }) => {
       const amount = parseFloat(row.getValue("price"));
-      const formatted = formatCurrency(amount);
-
-      return <div>{formatted}</div>;
+      const formatted = formatCurrency(amount);      return <div>{formatted}</div>;
+    },
+  },
+  {
+    accessorKey: "category",
+    header: ({ column }) => (
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+      >
+        Category
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    ),
+    cell: ({ row }) => {
+      const category = row.original.category;
+      return (
+        <div className="flex flex-col">
+          {category ? (
+            <>
+              <span className="font-medium">{category.name}</span>
+              <span className="text-xs text-muted-foreground">Level {category.level}</span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">No category</span>
+          )}
+        </div>
+      );
     },
   },
   {

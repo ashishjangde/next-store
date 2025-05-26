@@ -229,6 +229,78 @@ export const ProductActions = {
         headers: cookies ? { Cookie: cookies } : {},
       }
     );
+      return response.data;
+  },
+  /**
+   * Get vendor parent products (products without parent)
+   * @param params Search and filtering parameters
+   * @param cookies Optional cookies for server-side requests
+   * @returns List of vendor parent products with pagination info
+   */
+  getVendorParentProducts: async (
+    params: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      category_id?: string;
+      include_category?: boolean;
+      include_attributes?: boolean;
+      include_children?: boolean;
+      sort_by?: string;
+      sort_order?: 'asc' | 'desc';
+    } = {},
+    cookies?: string
+  ): Promise<ApiResponse<ProductListResponse>> => {
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.category_id) queryParams.append('category_id', params.category_id);
+    if (params.include_category) queryParams.append('include_category', 'true');
+    if (params.include_attributes) queryParams.append('include_attributes', 'true');
+    if (params.include_children) queryParams.append('include_children', 'true');
+    if (params.sort_by) queryParams.append('sort_by', params.sort_by);
+    if (params.sort_order) queryParams.append('sort_order', params.sort_order);
+    
+    const response = await axiosInstance.get<ApiResponse<ProductListResponse>>(
+      `/products/vendor/parent?${queryParams.toString()}`,
+      {
+        headers: cookies ? { Cookie: cookies } : {},
+      }
+    );
+    
+    return response.data;
+  },
+
+  /**
+   * Get a vendor product by ID
+   * @param id Product ID
+   * @param includeOptions Additional data to include
+   * @param cookies Optional cookies for server-side requests
+   * @returns The requested vendor product
+   */
+  getVendorProductById: async (
+    id: string,
+    includeOptions: {
+      include_category?: boolean;
+      include_attributes?: boolean;
+      include_children?: boolean;
+    } = {},
+    cookies?: string
+  ): Promise<ApiResponse<Product>> => {
+    const queryParams = new URLSearchParams();
+    
+    if (includeOptions.include_category) queryParams.append('include_category', 'true');
+    if (includeOptions.include_attributes) queryParams.append('include_attributes', 'true');
+    if (includeOptions.include_children) queryParams.append('include_children', 'true');
+    
+    const response = await axiosInstance.get<ApiResponse<Product>>(
+      `/products/vendor/${id}?${queryParams.toString()}`,
+      {
+        headers: cookies ? { Cookie: cookies } : {},
+      }
+    );
     
     return response.data;
   }

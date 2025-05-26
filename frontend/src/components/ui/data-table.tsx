@@ -33,6 +33,8 @@ interface DataTableProps<TData, TValue> {
   totalItems?: number;
   disablePagination?: boolean;
   meta?: CustomTableMeta<TData>;
+  onSortingChange?: (updater: any) => void;
+  sorting?: SortingState;
 }
 
 export function DataTable<TData, TValue>({
@@ -41,9 +43,15 @@ export function DataTable<TData, TValue>({
   totalItems,
   disablePagination = false,
   meta,
+  onSortingChange,
+  sorting: externalSorting,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [internalSorting, setInternalSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+  // Use external sorting if provided, otherwise use internal sorting
+  const sorting = externalSorting || internalSorting;
+  const setSorting = onSortingChange || setInternalSorting;
 
   const table = useReactTable({
     data,

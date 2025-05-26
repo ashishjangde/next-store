@@ -19,7 +19,6 @@ export interface Product {
   season?: string;
   weight?: number;
   is_active: boolean;
-  category_id: string;
   product_type: ProductTypeEnum;
   created_at: Date;
   updated_at: Date;
@@ -73,9 +72,10 @@ export interface ProductUpdateInput extends Partial<Omit<ProductCreateInput, 'im
  */
 export interface ProductListResponse {
   products: Product[];
-  totalItems: number;
-  currentPage: number;
+  total: number;
+  page: number;
   totalPages: number;
-  hasNext: boolean;
-  hasPrevious: boolean;
+  limit: number;
+  query?: string;
+  filters?: any;
 }

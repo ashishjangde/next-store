@@ -1,24 +1,17 @@
 import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductType } from '@prisma/client';
 
-export class ProductCreateDto {  @ApiProperty({ example: 'Mens Cotton T-Shirt' })
+export class ProductCreateDto {  
+  @ApiProperty({ example: 'Mens Cotton T-Shirt' })
   @IsString({ message: 'Title must be a string' })
   title: string;
 
   @ApiProperty({ example: 'Comfortable cotton t-shirt for everyday wear' })
   @IsString({ message: 'Description must be a string' })
   description: string;
-  @ApiPropertyOptional({ example: 'mens-cotton-t-shirt', description: 'Automatically generated from title if not provided' })
-  @IsOptional()
-  @IsString()
-  slug?: string;
 
-  @ApiPropertyOptional({ example: 'TCT001' })
-  @IsOptional()
-  @IsString()
-  sku?: string;  
+
   @ApiProperty({ example: 29.99 })
   @IsNumber({}, { message: 'Price must be a valid number' })
   @Type(() => Number)
