@@ -4,33 +4,30 @@ import { useState, useMemo, useEffect } from "react";
 import { ProductActions } from "@/api-actions/product-actions";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
 import { ProductColumns } from "./columns";
 import { PageHeader } from "@/components/common/page-header";
-import { ProductFilters } from "./product-filters";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 
 export const ProductsClient = () => {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryId, setCategoryId] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  const [categoryId, setCategoryId] = useState<string>("all");
   const [sortBy, setSortBy] = useState("created_at");
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>("desc");
-  const [isSearching, setIsSearching] = useState(false);
+
 
   // Debounce search input with loading state
   useEffect(() => {
-    if (search !== debouncedSearch) {
-      setIsSearching(true);
-    }
     
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
       setPage(1); // Reset to first page when search changes
-      setIsSearching(false);
     }, 500);
 
     return () => clearTimeout(timer);
@@ -60,20 +57,19 @@ export const ProductsClient = () => {
   };  // Use TanStack Query to get products with server-side filtering
   const { data: productsData } = useQuery({
     queryKey: ["vendor-products", page, limit, debouncedSearch, categoryId, sortBy, sortOrder],
-    queryFn: async () => {
-      return await ProductActions.getVendorParentProducts({
+    queryFn: async () => {      return await ProductActions.getVendorParentProducts({
         page,
         limit,
         search: debouncedSearch || undefined,
-        category_id: categoryId || undefined,
+        category_id: categoryId === "all" ? undefined : categoryId,
         include_category: true, // Include category data for display
+        include_attributes: true, // Include attributes for display
         include_children: true, // Include children for variant count
         sort_by: sortBy,
         sort_order: sortOrder,
       });
     },
-    refetchOnWindowFocus: false, // Disable auto-refetch for better UX
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    refetchOnWindowFocus: true,
   });
 
   const products = useMemo(() => {
@@ -84,7 +80,6 @@ export const ProductsClient = () => {
     return productsData?.data || null;
   }, [productsData]);
 
-  // Extract unique categories from products for filter dropdown
   const categoriesFromProducts = useMemo(() => {
     const uniqueCategories = new Map();
     products.forEach((product: any) => {
@@ -100,36 +95,67 @@ export const ProductsClient = () => {
 
 
   return (
-    <div className="space-y-4">
-      <PageHeader
+    <div className="space-y-4">      <PageHeader
         title="Products"
         description="Manage your product catalog"
       />
-        <div className="flex items-center justify-between">        <ProductFilters 
-          search={search}
-          onSearchChange={setSearch}
-          categoryId={categoryId}
-          onCategoryChange={setCategoryId}
-          limit={limit}
-          onLimitChange={setLimit}
-          categories={categoriesFromProducts}
-          isSearching={isSearching}
-        />
+      
+      {/* Filters and Controls */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-1 flex-col gap-4 md:flex-row md:items-center">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+            {/* Category Filter */}
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categoriesFromProducts.map((category: any) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Items per page */}
+          <Select value={limit.toString()} onValueChange={(value) => setLimit(parseInt(value))}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5 per page</SelectItem>
+              <SelectItem value="10">10 per page</SelectItem>
+              <SelectItem value="20">20 per page</SelectItem>
+              <SelectItem value="50">50 per page</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {/* Add Product Button */}
         <Link href="/vendor/dashboard/products/new">
-          <Button className="ml-auto">
+          <Button>
             <Plus className="h-4 w-4 mr-2" />
             Add Product
           </Button>
         </Link>
-      </div>      
+      </div>
       <DataTable
         columns={ProductColumns}
         data={products}
         onSortingChange={handleSortingChange}
         sorting={[{ id: sortBy, desc: sortOrder === 'desc' }]}
-      />        
-
-      {/* Pagination Controls */}
+      />            {/* Pagination Controls */}
       {pagination && (
         <div className="flex items-center justify-between px-2">
           <div className="flex-1 text-sm text-muted-foreground">

@@ -38,22 +38,24 @@ export const ProductActions = ({ product, isVariant = false }: ProductActionsPro
   const [loading, setLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const { mutate: deleteProduct } = useMutation({
-    mutationFn: (id: string) => ProductAPI.deleteProduct(id),
-    onSuccess: () => {
-      toast.success("Product deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ["vendor-products"] });
+  const { mutate: deleteVariant, isPending: isDeleting } = useMutation({
+    mutationFn: async (variantId: string) => {
+      return await ProductAPI.deleteProduct(variantId);
     },
-    onError: (error) => {
-      toast.error("Failed to delete product");
-      console.error("Error deleting product:", error);
-    }
+    onSuccess: () => {
+      toast.success("Variant deleted successfully");
+      
+      queryClient.invalidateQueries();
+    },
+    onError: () => {
+      toast.error("Failed to delete variant");
+    },
   });
   
   const onDelete = async () => {
     setLoading(true);
     try {
-      await deleteProduct(product.id);
+      await deleteVariant(product.id);
       setShowDeleteModal(false);
     } catch (error) {
       toast.error("Something went wrong. Please try again.");

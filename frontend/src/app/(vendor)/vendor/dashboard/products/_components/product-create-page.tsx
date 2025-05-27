@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { useForm } from "react-hook-form";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { parseAsString, useQueryState } from "nuqs";
@@ -55,6 +55,7 @@ type FormData = {
 
 export const ProductCreatePage = () => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const duplicateFromId = searchParams.get("duplicate");
   const updateProductId = searchParams.get("update");
@@ -98,13 +99,6 @@ export const ProductCreatePage = () => {
       attribute_value_ids: [],
     },
   });// Fetch categories
-  const { data: categoriesData } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      return await CategoryActions.getRootCategories();
-    },
-    staleTime: 60000, // 1 minute
-  });  // If updating, fetch product data to edit
   const { data: updateProductData, isLoading: isLoadingUpdate } = useQuery({
     queryKey: ["update-product", updateProductId],
     queryFn: async () => {
@@ -161,8 +155,10 @@ export const ProductCreatePage = () => {
           images: selectedImages,
         });
       }
-    },
+    },     
     onSuccess: (data) => {
+      queryClient.invalidateQueries()
+        
       if (isUpdate) {
         toast.success("Product updated successfully");
         router.push(`/vendor/dashboard/products/${updateProductId}`);
@@ -179,7 +175,6 @@ export const ProductCreatePage = () => {
       }
     },
     onError: (error) => {
-      console.error("Error creating/updating product:", error);
       toast.error(isUpdate ? "Failed to update product" : "Failed to create product");
     },
   });  // Pre-fill form with product data for updating

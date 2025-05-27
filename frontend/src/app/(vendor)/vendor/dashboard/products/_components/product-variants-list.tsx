@@ -46,25 +46,12 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
         }
       );
     },
-    staleTime: 10000, // 10 seconds
   });
 
   const product = data?.data;
   const variants = product?.children || [];
-
   // Delete variant mutation
-  const { mutate: deleteVariant, isPending: isDeleting } = useMutation({
-    mutationFn: (variantId: string) => {
-      return ProductActions.deleteProduct(variantId);
-    },
-    onSuccess: () => {
-      toast.success("Variant deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ["product-variants", productId] });
-    },
-    onError: () => {
-      toast.error("Failed to delete variant");
-    },
-  });
+
 
   if (isLoading) {
     return (
@@ -87,11 +74,6 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
     );
   }
 
-  const handleDeleteVariant = (variantId: string) => {
-    if (window.confirm("Are you sure you want to delete this variant?")) {
-      deleteVariant(variantId);
-    }
-  };
   return (
     <>
       <Card>
@@ -156,8 +138,14 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                             No image
                           </div>
                         )}
-                      </TableCell>                      <TableCell>
-                        <div className="font-medium">{variant.title}</div>
+                      </TableCell>                        
+                      <TableCell>
+                        <div 
+                          className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer hover:underline transition-colors"
+                          onClick={() => router.push(`/vendor/dashboard/products/${variant.id}`)}
+                        >
+                          {variant.title}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {/* Show category instead of attributes */}
                           {variant.category && (
