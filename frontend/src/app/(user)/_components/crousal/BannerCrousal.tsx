@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination, Navigation } from 'swiper/modules';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -9,40 +9,94 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/navigation';
 
+interface Banner {
+  id: string;
+  title: string;
+  description?: string;
+  image_url: string;
+  is_active: boolean;
+  sort_order: number;
+}
+
 export default function BannerCrousal() {
-  // Sample images for demonstration
-  const slides = [
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchBanners();
+  }, []);
+
+  const fetchBanners = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ui/banners`);
+      const data = await response.json();
+      
+      if (data.success && data.data) {
+        setBanners(data.data);
+      } else {
+        // Fallback to sample data if API fails
+        setBanners(sampleBanners);
+      }
+    } catch (error) {
+      console.error('Error fetching banners:', error);
+      // Fallback to sample data
+      setBanners(sampleBanners);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sample banners as fallback
+  const sampleBanners = [
     {
-      id: 1,
-      bgColor: 'bg-blue-600',
-      content: 'First Slide with Sample Content',
-      image: '/api/placeholder/1200/500'
+      id: '1',
+      title: 'Summer Sale - Up to 50% Off',
+      description: 'Great deals on summer collection',
+      image_url: '/api/placeholder/1200/500',
+      is_active: true,
+      sort_order: 1
     },
     {
-      id: 2,
-      bgColor: 'bg-purple-600',
-      content: 'Second Slide with Sample Content',
-      image: '/api/placeholder/1200/500'
+      id: '2',
+      title: 'New Arrivals',
+      description: 'Check out our latest products',
+      image_url: '/api/placeholder/1200/500',
+      is_active: true,
+      sort_order: 2
     },
     {
-      id: 3,
-      bgColor: 'bg-green-600',
-      content: 'Third Slide with Sample Content',
-      image: '/api/placeholder/1200/500'
+      id: '3',
+      title: 'Free Shipping',
+      description: 'On orders over $50',
+      image_url: '/api/placeholder/1200/500',
+      is_active: true,
+      sort_order: 3
     },
     {
-      id: 4,
-      bgColor: 'bg-red-600',
-      content: 'Fourth Slide with Sample Content',
-      image: '/api/placeholder/1200/500'
+      id: '4',
+      title: 'Best Sellers',
+      description: 'Most popular items this month',
+      image_url: '/api/placeholder/1200/500',
+      is_active: true,
+      sort_order: 4
     },
     {
-      id: 5,
-      bgColor: 'bg-yellow-600',
-      content: 'Fifth Slide with Sample Content',
-      image: '/api/placeholder/1200/500'
+      id: '5',
+      title: 'Limited Time Offer',
+      description: 'Exclusive deals ending soon',
+      image_url: '/api/placeholder/1200/500',
+      is_active: true,
+      sort_order: 5
     }
   ];
+
+  if (loading) {
+    return (
+      <div className="w-full max-w-[calc(100vw-10px)] sm:max-w-[calc(100vw-2px)] px-2 sm:px-4 mx-auto h-[170px] sm:h-[240px] bg-gray-200 animate-pulse rounded-lg"></div>
+    );
+  }
+
+  const displayBanners = banners.length > 0 ? banners : sampleBanners;
 
   return (
     <div className="w-full max-w-[calc(100vw-10px)] sm:max-w-[calc(100vw-2px)] px-2 sm:px-4 mx-auto h-[170px] sm:h-[240px] relative group">
@@ -51,11 +105,11 @@ export default function BannerCrousal() {
           ['--swiper-navigation-color' as string]: '#2563eb',
           ['--swiper-pagination-color' as string]: '#2563eb',
         }}
-        className="w-full h-full"
+        className="w-full h-full rounded-lg overflow-hidden"
         spaceBetween={0}
         centeredSlides={true}
         autoplay={{
-          delay: 2500,
+          delay: 3000,
           disableOnInteraction: false,
         }}
         pagination={{
@@ -67,16 +121,25 @@ export default function BannerCrousal() {
         }}
         modules={[Autoplay, Pagination, Navigation]}
       >
-        {slides.map((slide) => (
-          <SwiperSlide key={slide.id} className={`${slide.bgColor} relative`}>
+        {displayBanners.map((banner) => (
+          <SwiperSlide key={banner.id} className="relative">
             <div className="w-full h-full flex items-center justify-center relative">
               <img 
-                src={slide.image}
-                alt={`Slide ${slide.id}`}
+                src={banner.image_url}
+                alt={banner.title}
                 className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Fallback to placeholder if image fails to load
+                  (e.target as HTMLImageElement).src = '/api/placeholder/1200/500';
+                }}
               />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <h2 className="text-4xl font-bold text-white">{slide.content}</h2>
+              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                <div className="text-center text-white px-4">
+                  <h2 className="text-2xl sm:text-4xl font-bold mb-2">{banner.title}</h2>
+                  {banner.description && (
+                    <p className="text-sm sm:text-lg opacity-90">{banner.description}</p>
+                  )}
+                </div>
               </div>
             </div>
           </SwiperSlide>

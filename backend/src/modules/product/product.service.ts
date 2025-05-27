@@ -650,6 +650,40 @@ export class ProductService {
     }
   }
 
+  /**
+   * Get featured products for home page display
+   * Returns active products with high ratings or marked as featured
+   */
+  async getFeaturedProducts(limit: number = 8): Promise<ProductResponseDto[]> {
+    try {
+      const result = await this.productRepo.findAllProducts({
+        skip: 0,
+        take: limit,
+        isActive: true,
+        archived: false,
+        includeCategory: true,
+        includeAttributes: false,
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+      });
+
+      if (!result) {
+        return [];
+      }
+
+      const transformedProducts = result.products.map(product => 
+        this.transformProductResponse(product)
+      );
+
+      return transformedProducts.map(product => 
+        plainToClass(ProductResponseDto, product)
+      );
+    } catch (error) {
+      this.logger.error(`Error getting featured products: ${error.message}`, error.stack);
+      return [];
+    }
+  }
+
   private transformProductResponse(product: any): any {
     const transformed = {
       id: product.id,

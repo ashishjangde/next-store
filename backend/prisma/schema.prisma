@@ -72,6 +72,27 @@ enum ProductType {
   VARIANT
 }
 
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum PromotionType {
+  DISCOUNT_CODE
+  AUTOMATIC_DISCOUNT
+  BUNDLE_OFFER
+  SEASONAL_SALE
+}
+
+enum PromotionStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+}
+
 
 model Category {
   id            String     @id @default(uuid())
@@ -160,7 +181,8 @@ model Users {
   retry_timestamp             DateTime?
   vefification_hash           String?         @unique
   verification_code_expire_at DateTime?
-  is_verified                 Boolean
+  is_verified                 Boolean  
+  
   // Relationships
   Sessions                    Sessions[]
   Addresses                   Address[]
@@ -172,6 +194,9 @@ model Users {
   Vendor                      Vendor?
   Payment                     Payment[]
   ProductHistory              ProductHistory[]
+  Banners                     Banner[]
+  Promotions                  Promotion[]
+  PromotionUsages             PromotionUsage[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -308,11 +333,11 @@ model Order {
   // Archiving fields
   archived      Boolean     @default(false)
   archived_at   DateTime?
-
   Users         Users       @relation(fields: [user_id], references: [id])
   Address       Address     @relation(fields: [address_id], references: [id])
   OrderItems    OrderItem[]
   Payment       Payment?
+  PromotionUsages PromotionUsage[]
 }
 
 model OrderItem {
@@ -380,4 +405,60 @@ model Payment {
   
   Order          Order           @relation(fields: [order_id], references: [id])
   Users          Users           @relation(fields: [user_id], references: [id])
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  @db.Text
+  image_url   String
+  is_active   Boolean  @default(true)
+  sort_order  Int      @default(0)
+  created_by  String
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  // Admin who created/updated the banner
+  creator     Users    @relation(fields: [created_by], references: [id])
+}
+
+model Promotion {
+  id              String          @id @default(uuid())
+  name            String
+  description     String?         @db.Text
+  code            String?         @unique // For discount codes
+  type            PromotionType
+  discount_type   DiscountType
+  discount_value  Float           // Percentage or fixed amount
+  minimum_amount  Float?          // Minimum order amount
+  maximum_uses    Int?            // Total usage limit
+  uses_per_user   Int?            // Usage limit per user
+  current_uses    Int             @default(0)
+  status          PromotionStatus @default(DRAFT)
+  starts_at       DateTime
+  ends_at         DateTime?
+  is_active       Boolean         @default(true)
+  created_by      String
+  created_at      DateTime        @default(now())
+  updated_at      DateTime        @updatedAt
+  
+  // Relations
+  creator         Users           @relation(fields: [created_by], references: [id])
+  usage_history   PromotionUsage[]
+  applicable_categories String[]    // Category IDs this promotion applies to
+  applicable_products   String[]    // Product IDs this promotion applies to
+}
+
+model PromotionUsage {
+  id            String    @id @default(uuid())
+  promotion_id  String
+  user_id       String?   // Null for guest users
+  order_id      String?   // If applied to an order
+  discount_amount Float
+  used_at       DateTime  @default(now())
+  
+  // Relations
+  promotion     Promotion @relation(fields: [promotion_id], references: [id], onDelete: Cascade)
+  user          Users?    @relation(fields: [user_id], references: [id])
+  order         Order?    @relation(fields: [order_id], references: [id])
 }
