@@ -137,18 +137,22 @@ export class ProductRepository {
     } catch (error) {
       this.logger.error(`Error indexing product to Elasticsearch: ${error.message}`, error);
     }
-  }async createProduct(data: ProductCreateDto & { vendor_id: string }): Promise<Product> {
+  }  async createProduct(data: ProductCreateDto & { vendor_id: string }): Promise<Product> {
     const { parent_id, category_id, vendor_id, initial_quantity, low_stock_threshold, attribute_value_ids, ...rest } = data;
+    
+    // Generate unique slug for the product
+    const uniqueSlug = await this.generateUniqueSlug(rest.title, vendor_id);
+    
     const product = await this.prisma.product.create({
       data: {
         ...rest,
-        slug: slugify(rest.title),
+        slug: uniqueSlug,
         Vendor: { connect: { id: vendor_id } },
         category: category_id ? { connect: { id: category_id } } : undefined,
         parent: parent_id ? { connect: { id: parent_id } } : undefined,
       },
       include: this.buildIncludeObject(),
-    });    await this.cacheProduct(product);
+    });await this.cacheProduct(product);
     
     // Invalidate related caches to ensure product listings include the new product
     await this.performComprehensiveProductCreationCacheInvalidation(product);
@@ -624,9 +628,7 @@ export class ProductRepository {
           `inventory:vendor:${productData.vendor_id}:include:true`,
           `inventory:vendor:${productData.vendor_id}:include:false`
         );
-      }
-
-      // 3. Vendor products list caches
+      }      // 3. Vendor products list caches
       cacheKeysToDelete.push(
         `vendor:products:${productData.vendor_id}`,
         `products:vendor:${productData.vendor_id}`,
@@ -646,13 +648,36 @@ export class ProductRepository {
             `product:slug:${child.slug}`,
             `inventory:product:${child.id}`
           );
-        }
-      } else if (productData.parent_id) {
+        }      } else if (productData.parent_id) {
         // If deleting a variant, invalidate parent's variant list cache
         cacheKeysToDelete.push(
           `product:variants:${productData.parent_id}`,
           `product:${productData.parent_id}`,
-          `product:id:${productData.parent_id}`
+          `product:id:${productData.parent_id}`,
+          
+          // Parent product cache entries with all possible include option combinations
+          // This is crucial for when parent product is fetched with include_children: true
+          `product:id:${productData.parent_id}:cat:true:attr:true:children:true`,
+          `product:id:${productData.parent_id}:cat:true:attr:true:children:false`,
+          `product:id:${productData.parent_id}:cat:true:attr:false:children:true`,
+          `product:id:${productData.parent_id}:cat:true:attr:false:children:false`,
+          `product:id:${productData.parent_id}:cat:false:attr:true:children:true`,
+          `product:id:${productData.parent_id}:cat:false:attr:true:children:false`,
+          `product:id:${productData.parent_id}:cat:false:attr:false:children:true`,
+          `product:id:${productData.parent_id}:cat:false:attr:false:children:false`,
+          
+          // Vendor-specific parent product caches with all combinations
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:true:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:true:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:false:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:false:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:true:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:true:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:false:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:false:children:false`,
+          
+          // Frontend query cache keys for product variants list
+          `product-variants:${productData.parent_id}`
         );
       }
 
@@ -691,14 +716,19 @@ export class ProductRepository {
       for (let i = 0; i < cacheKeysToDelete.length; i += batchSize) {
         const batch = cacheKeysToDelete.slice(i, i + batchSize);
         await this.redis.pipelineDel(batch);
-      }
-
-      // Also clear any pattern-based caches using Redis SCAN and DELETE
+      }      // Also clear any pattern-based caches using Redis SCAN and DELETE
       await this.clearPatternBasedCaches([
         `*product:${productData.id}*`,
         `*vendor:${productData.vendor_id}:product*`,
+        `*vendor:${productData.vendor_id}:parent-products*`,
         `*products:*${productData.id}*`,
-        `*inventory:*${productData.id}*`
+        `*inventory:*${productData.id}*`,
+        ...(productData.parent_id ? [
+          `*product-variants:${productData.parent_id}*`,
+          `*product:${productData.parent_id}*`,
+          `*product:id:${productData.parent_id}*`,
+          `*vendor:${productData.vendor_id}:product:${productData.parent_id}*`
+        ] : [])
       ]);
 
       this.logger.log(`Comprehensive cache invalidation completed for deleted product ${productData.id}`);
@@ -757,6 +787,9 @@ export class ProductRepository {
           `product:variants:${productData.parent_id}`,
           `product:${productData.parent_id}`,
           `product:id:${productData.parent_id}`,
+          
+          // Frontend query cache keys for product variants list
+          `product-variants:${productData.parent_id}`,
           
           // Parent product cache entries with ALL possible include option combinations
           // These are critical because they contain the children relationship that just changed
@@ -818,16 +851,14 @@ export class ProductRepository {
       for (let i = 0; i < cacheKeysToDelete.length; i += batchSize) {
         const batch = cacheKeysToDelete.slice(i, i + batchSize);
         await this.redis.pipelineDel(batch);
-      }
-
-      // Also clear any pattern-based caches using Redis SCAN and DELETE
+      }      // Also clear any pattern-based caches using Redis SCAN and DELETE
       await this.clearPatternBasedCaches([
         `*vendor:${productData.vendor_id}:products*`,
         `*vendor:${productData.vendor_id}:parent-products*`,
         `*products:vendor:${productData.vendor_id}*`,
         `*dashboard:products*`,
         ...(productData.category_id ? [`*category:${productData.category_id}:products*`] : []),
-        ...(productData.parent_id ? [`*variants:${productData.parent_id}*`] : [])
+        ...(productData.parent_id ? [`*variants:${productData.parent_id}*`, `*product-variants:${productData.parent_id}*`] : [])
       ]);
 
       this.logger.log(`Comprehensive cache invalidation completed for created product ${productData.id}`);
@@ -875,15 +906,37 @@ export class ProductRepository {
         `vendor:${productData.vendor_id}:products`,
         `vendor:${productData.vendor_id}:dashboard:products`,
         `dashboard:products:vendor:${productData.vendor_id}`
-      );
-
-      // 3. Parent-child relationship caches
+      );      // 3. Parent-child relationship caches
       if (productData.parent_id) {
         // If updating a variant, invalidate parent's variant list cache
         cacheKeysToDelete.push(
           `product:variants:${productData.parent_id}`,
           `product:${productData.parent_id}`,
-          `product:id:${productData.parent_id}`
+          `product:id:${productData.parent_id}`,
+          
+          // Parent product cache entries with all possible include option combinations
+          // This is crucial for when parent product is fetched with include_children: true
+          `product:id:${productData.parent_id}:cat:true:attr:true:children:true`,
+          `product:id:${productData.parent_id}:cat:true:attr:true:children:false`,
+          `product:id:${productData.parent_id}:cat:true:attr:false:children:true`,
+          `product:id:${productData.parent_id}:cat:true:attr:false:children:false`,
+          `product:id:${productData.parent_id}:cat:false:attr:true:children:true`,
+          `product:id:${productData.parent_id}:cat:false:attr:true:children:false`,
+          `product:id:${productData.parent_id}:cat:false:attr:false:children:true`,
+          `product:id:${productData.parent_id}:cat:false:attr:false:children:false`,
+          
+          // Vendor-specific parent product caches with all combinations
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:true:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:true:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:false:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:true:attr:false:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:true:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:true:children:false`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:false:children:true`,
+          `vendor:${productData.vendor_id}:product:${productData.parent_id}:cat:false:attr:false:children:false`,
+          
+          // Frontend query cache keys for product variants list
+          `product-variants:${productData.parent_id}`
         );
       }
 
@@ -924,9 +977,7 @@ export class ProductRepository {
       for (let i = 0; i < cacheKeysToDelete.length; i += batchSize) {
         const batch = cacheKeysToDelete.slice(i, i + batchSize);
         await this.redis.pipelineDel(batch);
-      }
-
-      // Also clear any pattern-based caches using Redis SCAN and DELETE
+      }      // Also clear any pattern-based caches using Redis SCAN and DELETE
       await this.clearPatternBasedCaches([
         `*product:${productData.id}*`,
         `*vendor:${productData.vendor_id}:products*`,
@@ -934,7 +985,13 @@ export class ProductRepository {
         `*products:vendor:${productData.vendor_id}*`,
         `*dashboard:products*`,
         ...(productData.category_id ? [`*category:${productData.category_id}:products*`] : []),
-        ...(productData.parent_id ? [`*variants:${productData.parent_id}*`] : [])
+        ...(productData.parent_id ? [
+          `*variants:${productData.parent_id}*`, 
+          `*product-variants:${productData.parent_id}*`,
+          `*product:${productData.parent_id}*`,
+          `*product:id:${productData.parent_id}*`,
+          `*vendor:${productData.vendor_id}:product:${productData.parent_id}*`
+        ] : [])
       ]);
 
       this.logger.log(`Comprehensive cache invalidation completed for updated product ${productData.id}`);
@@ -1591,5 +1648,47 @@ export class ProductRepository {
     }
     
     return include;
+  }
+
+  /**
+   * Generate a unique slug by checking for existing slugs and appending a suffix if needed
+   * @param baseSlug The base slug to check
+   * @param vendorId Optional vendor ID to scope the uniqueness check to a specific vendor
+   * @returns A unique slug
+   */
+  private async generateUniqueSlug(baseSlug: string, vendorId?: string): Promise<string> {
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    
+    while (true) {
+      // Check if slug exists in database
+      const whereCondition: any = { slug: uniqueSlug };
+      if (vendorId) {
+        whereCondition.vendor_id = vendorId;
+      }
+      
+      const existingProduct = await this.prisma.product.findFirst({
+        where: whereCondition,
+        select: { id: true }
+      });
+      
+      if (!existingProduct) {
+        // Slug is unique, we can use it
+        break;
+      }
+      
+      // Slug exists, try with a suffix
+      uniqueSlug = `${baseSlug}-${counter}`;
+      counter++;
+      
+      // Safety check to prevent infinite loops
+      if (counter > 1000) {
+        // Fallback to timestamp-based uniqueness
+        uniqueSlug = `${baseSlug}-${Date.now()}`;
+        break;
+      }
+    }
+    
+    return uniqueSlug;
   }
 }

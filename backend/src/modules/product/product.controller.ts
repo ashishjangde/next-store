@@ -72,7 +72,6 @@ export class ProductController {
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: Users,
   ) {
-    try {
       // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -81,12 +80,7 @@ export class ProductController {
 
       const product = await this.productService.createProduct(vendorId, createProductDto, images);
       return new ApiResponseClass(product);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+   
   }
 
   @Get()
@@ -112,7 +106,6 @@ export class ProductController {
     @Query('vendor_id') vendorId?: string,
     @Query('product_type') productType?: ProductType,
   ) {
-    try {
       const pageNum = parseInt(page, 10);
       const limitNum = parseInt(limit, 10);
 
@@ -126,12 +119,7 @@ export class ProductController {
       });
 
       return new ApiResponseClass(result);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+   
   }
 
   @Get(':id')
@@ -158,7 +146,7 @@ export class ProductController {
     @Query('include_attributes') includeAttributes: string = 'false',
     @Query('include_children') includeChildren: string = 'false',
   ) {
-    try {
+
       const product = await this.productService.getProductById(
         id,
         includeCategory === 'true',
@@ -167,12 +155,7 @@ export class ProductController {
       );
 
       return new ApiResponseClass(product);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+   
   }
 
   @Put(':id')
@@ -205,7 +188,6 @@ export class ProductController {
     @UploadedFiles() images: Express.Multer.File[],
     @GetUser() user: Users,
   ) {
-    try {
       // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -215,12 +197,7 @@ export class ProductController {
       const product = await this.productService.updateProduct(vendorId, id, updateProductDto, images);
 
       return new ApiResponseClass(product);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+   
   }
 
   @Delete(':id')
@@ -247,7 +224,7 @@ export class ProductController {
     schema: ApiCustomErrorResponse(HttpStatus.FORBIDDEN, 'Unauthorized'),
   })
   async deleteProduct(@Param('id') id: string, @GetUser() user: Users) {
-    try {
+
       // Get vendor information using user ID - following original pattern
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -257,12 +234,7 @@ export class ProductController {
       await this.productService.deleteProduct(vendorId, id);
 
       return new ApiResponseClass({ message: 'Product deleted successfully' });
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+  
   }
 
   // Attribute management routes
@@ -280,7 +252,6 @@ export class ProductController {
     @Body() body: { attributeValueId: string },
     @GetUser() user: Users,
   ) {
-    try {
       // Get vendor information using user ID - following original pattern
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -290,12 +261,7 @@ export class ProductController {
       const result = await this.productService.addAttributeToProduct(vendorId, productId, body.attributeValueId);
 
       return new ApiResponseClass(result);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+   
   }
 
   @Delete(':id/attributes/:attributeValueId')
@@ -313,7 +279,6 @@ export class ProductController {
     @Param('attributeValueId') attributeValueId: string,
     @GetUser() user: Users,
   ) {
-    try {
       // Get vendor information using user ID - following original pattern
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -323,12 +288,7 @@ export class ProductController {
       const result = await this.productService.removeAttributeFromProduct(vendorId, productId, attributeValueId);
 
       return new ApiResponseClass(result);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+   
   }
 
   /**
@@ -372,7 +332,6 @@ export class ProductController {
     @Query('sort_by') sortBy: string = 'created_at',
     @Query('sort_order') sortOrder: 'asc' | 'desc' = 'desc',
   ) {
-    try {
       // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -403,12 +362,7 @@ export class ProductController {
       );
       
       return new ApiResponseClass(result);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+    
   }
   
   @Get('vendor/:id')
@@ -444,7 +398,6 @@ export class ProductController {
     @Query('include_attributes') includeAttributes: string = 'false',
     @Query('include_children') includeChildren: string = 'false',
   ) {
-    try {
       // Get vendor information using user ID
       const vendor = await this.vendorRepository.findVendorByUserId(user.id);
       
@@ -465,11 +418,6 @@ export class ProductController {
       );
       
       return new ApiResponseClass(product);
-    } catch (error) {
-      if (error instanceof ApiError) {
-        return new ApiResponseClass(null, error);
-      }
-      return new ApiResponseClass(null, new ApiError(HttpStatus.INTERNAL_SERVER_ERROR, 'Internal server error'));
-    }
+    
   }
 }

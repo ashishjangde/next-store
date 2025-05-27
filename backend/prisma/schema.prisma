@@ -72,9 +72,7 @@ enum ProductType {
   VARIANT
 }
 
-//Country of Origin is set to India by default
 
-// Category model specifically designed for clothing/apparel hierarchy
 model Category {
   id            String     @id @default(uuid())
   name          String     
@@ -99,7 +97,6 @@ model Category {
   attributes    CategoryAttribute[]
 }
 
-// Junction model for Category-Attribute many-to-many relationship
 model CategoryAttribute {
   category_id   String
   attribute_id  String

@@ -13,6 +13,9 @@ import { CategoryModule } from './modules/category/category.module';
 import { VendorModule } from './modules/vendor/vendor.module';
 import { AttributeModule } from './modules/attribute/attribute.module';
 import { GeneralModule } from './modules/general/general.module';
+import { UiModule } from './modules/ui/ui.module';
+import { BannersModule } from './modules/banners/banners.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import { GeneralModule } from './modules/general/general.module';
     AddressModule,
     VendorModule,
     GeneralModule,
+    BannersModule,
+    UiModule,
+    PromotionsModule,
   ],
   controllers: [],
   providers: [],
