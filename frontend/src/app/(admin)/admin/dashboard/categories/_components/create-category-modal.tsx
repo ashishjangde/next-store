@@ -35,19 +35,80 @@ interface ImageUploadProps {
   onChange: (file: File | null) => void;
 }
 
-// Simple placeholder for the image upload component
+// Image upload component with preview
 const ImageUpload = ({ value, onChange }: ImageUploadProps) => {
+  const [preview, setPreview] = useState<string>("");
+
+  // Handle file selection and create preview
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    
+    if (file) {
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setPreview(previewUrl);
+      onChange(file);
+    } else {
+      setPreview("");
+      onChange(null);
+    }
+  };
+
+  // Clean up preview URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
+
   return (
-    <div className="border-2 border-dashed rounded-lg p-4">
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0] || null;
-          onChange(file);
-        }}
-      />
-      {value && <div className="mt-2">Selected image: {value}</div>}
+    <div className="space-y-4">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        />
+        <p className="mt-2 text-sm text-gray-500">
+          Choose an image file (JPG, PNG, GIF)
+        </p>
+      </div>
+      
+      {/* Image Preview */}
+      {preview && (
+        <div className="relative">
+          <div className="relative w-full h-48 rounded-lg overflow-hidden border">
+            <img
+              src={preview}
+              alt="Preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPreview("");
+              onChange(null);
+              // Reset the file input
+              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (fileInput) fileInput.value = "";
+            }}
+            className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      
+      {/* Display existing image URL if available */}
+      {value && !preview && (
+        <div className="text-sm text-gray-600">
+          Current image: {value}
+        </div>
+      )}
     </div>
   );
 };
@@ -215,23 +276,21 @@ export const CreateCategoryModal = ({
                   <FormMessage />
                 </FormItem>
               )}
-            />
-
-            {/* Image field */}
+            />            {/* Image field */}
             <FormField
               control={form.control}
               name="image"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image</FormLabel>
+                  <FormLabel>Category Image</FormLabel>
                   <FormControl>
                     <ImageUpload
-                      value={field.value ? "File selected" : ""}
+                      value={field.value instanceof File ? field.value.name : ""}
                       onChange={(file) => field.onChange(file)}
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload a category image (optional)
+                    Upload a category image (optional). Recommended size: 400x400px
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

@@ -74,12 +74,11 @@ export default function CreatePromotionModal({ open, onClose, onSuccess }: Creat
     if (formData.discount_type === 'PERCENTAGE' && formData.discount_value > 100) {
       toast.error('Percentage discount cannot exceed 100%');
       return;
-    }
-
-    if (formData.type === 'DISCOUNT_CODE' && !formData.code?.trim()) {
-      toast.error('Discount code is required for discount code promotions');
-      return;
-    }    try {
+    }    if (formData.type === 'DISCOUNT_CODE' && !formData.code?.trim()) {
+      // Code will be auto-generated on the backend if not provided
+      // toast.error('Discount code is required for discount code promotions');
+      // return;
+    }try {
       setLoading(true);
       const response = await PromotionActions.createPromotion(formData);
       
@@ -170,18 +169,19 @@ export default function CreatePromotionModal({ open, onClose, onSuccess }: Creat
               placeholder="Describe your promotion..."
               rows={3}
             />
-          </div>
-
-          {formData.type === 'DISCOUNT_CODE' && (
+          </div>          {formData.type === 'DISCOUNT_CODE' && (
             <div className="space-y-2">
-              <Label htmlFor="code">Discount Code *</Label>
+              <Label htmlFor="code">Discount Code (Optional)</Label>
               <Input
                 id="code"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                placeholder="e.g., SUMMER20"
+                placeholder="e.g., SUMMER20 (leave empty to auto-generate)"
                 className="uppercase"
               />
+              <p className="text-xs text-muted-foreground">
+                Leave empty to automatically generate a unique code
+              </p>
             </div>
           )}
 

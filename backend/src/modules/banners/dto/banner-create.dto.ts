@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsBoolean, IsInt, Min, Max } from 'class-validator';
 
 export class BannerCreateDto {
   @ApiProperty({
@@ -17,7 +18,6 @@ export class BannerCreateDto {
   @IsOptional()
   @IsString()
   description?: string;
-
   @ApiProperty({
     description: 'Display order of the banner',
     example: 1,
@@ -26,14 +26,17 @@ export class BannerCreateDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(999)
+  @Type(() => Number)
   sort_order?: number;
-
-  @ApiProperty({
-    description: 'Whether the banner is active',
-    example: true,
-    required: false
-  })
-  @IsOptional()
-  @IsBoolean()
-  is_active?: boolean;
+ 
+   @ApiProperty({
+     description: 'Whether the banner is active',
+     example: true,
+     required: false
+   })
+   @IsOptional()
+   @IsBoolean()
+   @Type(() => Boolean)
+   is_active?: boolean;
 }

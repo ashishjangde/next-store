@@ -74,24 +74,29 @@ export default function PromotionsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
-
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const fetchPromotions = async () => {
     try {
-      setLoading(true);      const statusParam = statusFilter === 'all' ? undefined : statusFilter;
+      setLoading(true);
+      const statusParam = statusFilter === 'all' ? undefined : statusFilter;
       const response = await PromotionActions.getAllPromotions(currentPage, 10, statusParam);
       
       if (response.data) {
-        setPromotions(response.data.data);
-        setTotalPages(response.data.pagination.totalPages);
+        setPromotions(response.data.data || []);
+        setTotalPages(response.data.pagination?.totalPages || 1);
+      } else {
+        setPromotions([]);
+        setTotalPages(1);
       }
     } catch (error) {
       toast.error('Failed to fetch promotions');
       console.error('Error fetching promotions:', error);
+      setPromotions([]);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
-  };
-  const fetchStats = async () => {
+  };  const fetchStats = async () => {
     try {
       const response = await PromotionActions.getPromotionStats();
       if (response.data) {
@@ -99,25 +104,43 @@ export default function PromotionsPage() {
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+      // Set default stats on error
+      setStats({
+        totalPromotions: 0,
+        activePromotions: 0,
+        totalUsage: 0,
+        totalSavings: 0
+      });
     }
   };
-
   useEffect(() => {
     fetchPromotions();
     fetchStats();
   }, [currentPage, statusFilter]);
 
+  // Close any open dropdowns when modals open
+  useEffect(() => {
+    if (showCreateModal || showEditModal) {
+      setOpenDropdownId(null);
+    }
+  }, [showCreateModal, showEditModal]);
+
   const handleCreatePromotion = () => {
+    setOpenDropdownId(null); // Close any open dropdown
     setShowCreateModal(true);
   };
 
   const handleEditPromotion = (promotion: Promotion) => {
+    setOpenDropdownId(null); // Close any open dropdown
     setSelectedPromotion(promotion);
     setShowEditModal(true);
   };
-
   const handleDeletePromotion = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this promotion?')) return;    try {
+    if (!confirm('Are you sure you want to delete this promotion?')) return;
+    
+    setOpenDropdownId(null); // Close any open dropdown
+    
+    try {
       const response = await PromotionActions.deletePromotion(id);
       if (response.data) {
         toast.success('Promotion deleted successfully');
@@ -131,8 +154,12 @@ export default function PromotionsPage() {
   };
 
   const handleToggleStatus = async (promotion: Promotion) => {
+    setOpenDropdownId(null); // Close any open dropdown
+    
     try {
-      const newStatus = promotion.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';      const response = await PromotionActions.updatePromotion(promotion.id, {
+      const newStatus = promotion.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+      
+      const response = await PromotionActions.updatePromotion(promotion.id, {
         status: newStatus
       });
       
@@ -174,8 +201,7 @@ export default function PromotionsPage() {
       return 'Free Shipping';
     }
   };
-
-  const filteredPromotions = promotions.filter(promotion =>
+  const filteredPromotions = (promotions || []).filter(promotion =>
     promotion.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (promotion.code && promotion.code.toLowerCase().includes(searchTerm.toLowerCase()))
   );

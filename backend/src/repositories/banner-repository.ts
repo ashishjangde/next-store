@@ -20,12 +20,13 @@ export class BannerRepository {
       }
     });
   }
-
   async findAll(options?: {
     includeInactive?: boolean;
     includeCreator?: boolean;
+    limit?: number;
+    offset?: number;
   }): Promise<Banner[]> {
-    const { includeInactive = false, includeCreator = true } = options || {};
+    const { includeInactive = false, includeCreator = true, limit, offset } = options || {};
     
     return this.prisma.banner.findMany({
       where: includeInactive ? {} : { is_active: true },
@@ -41,7 +42,19 @@ export class BannerRepository {
             email: true,
           }
         }
-      } : undefined
+      } : undefined,
+      ...(limit && { take: limit }),
+      ...(offset && { skip: offset }),
+    });
+  }
+
+  async count(options?: {
+    includeInactive?: boolean;
+  }): Promise<number> {
+    const { includeInactive = false } = options || {};
+    
+    return this.prisma.banner.count({
+      where: includeInactive ? {} : { is_active: true },
     });
   }
 
@@ -81,8 +94,15 @@ export class BannerRepository {
       where: { id }
     });
   }
-
-  async findActiveForPublic(): Promise<Banner[]> {
+  async findActiveForPublic(): Promise<{
+    id: string;
+    title: string;
+    description: string | null;
+    image_url: string;
+    sort_order: number;
+    created_at: Date;
+    updated_at: Date;
+  }[]> {
     return this.prisma.banner.findMany({
       where: { is_active: true },
       orderBy: [

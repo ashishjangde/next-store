@@ -50,12 +50,11 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Hero Section with Carousel */}
+    <div className="flex flex-col min-h-screen">      {/* Hero Section with Carousel */}
       <div className="w-screen">
-        <BannerCrousal />
+        <BannerCrousal banners={homeData?.banners} loading={isLoading} />
         <div className="flex flex-col items-center justify-center">
-          <CategoryCrousal /> 
+          <CategoryCrousal categories={homeData?.categories} /> 
         </div>
       </div>
 

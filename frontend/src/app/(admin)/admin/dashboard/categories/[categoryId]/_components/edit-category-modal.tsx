@@ -34,21 +34,102 @@ import {
 interface ImageUploadProps {
   value: string;
   onChange: (file: File | null) => void;
+  existingImageUrl?: string;
 }
 
-// Simple placeholder for the image upload component
-const ImageUpload = ({ value, onChange }: ImageUploadProps) => {
+// Enhanced image upload component with preview
+const ImageUpload = ({ value, onChange, existingImageUrl }: ImageUploadProps) => {
+  const [preview, setPreview] = useState<string>("");
+
+  // Handle file selection and create preview
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    
+    if (file) {
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      setPreview(previewUrl);
+      onChange(file);
+    } else {
+      setPreview("");
+      onChange(null);
+    }
+  };
+
+  // Clean up preview URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (preview) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
+
   return (
-    <div className="border-2 border-dashed rounded-lg p-4">
-      <input 
-        type="file" 
-        accept="image/*" 
-        onChange={(e) => {
-          const file = e.target.files?.[0] || null;
-          onChange(file);
-        }} 
-      />
-      {value && <div className="mt-2">Selected image: {value}</div>}
+    <div className="space-y-4">
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        />
+        <p className="mt-2 text-sm text-gray-500">
+          Choose an image file to replace current image (JPG, PNG, GIF)
+        </p>
+      </div>
+      
+      {/* New Image Preview */}
+      {preview && (
+        <div className="relative">
+          <div className="relative w-full h-48 rounded-lg overflow-hidden border">
+            <img
+              src={preview}
+              alt="New image preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPreview("");
+              onChange(null);
+              // Reset the file input
+              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+              if (fileInput) fileInput.value = "";
+            }}
+            className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+          >
+            ×
+          </button>
+          <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+            New Image
+          </div>
+        </div>
+      )}
+      
+      {/* Current Image Display */}
+      {!preview && existingImageUrl && (
+        <div className="relative">
+          <div className="relative w-full h-48 rounded-lg overflow-hidden border">
+            <img
+              src={existingImageUrl}
+              alt="Current category image"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+            Current Image
+          </div>
+        </div>
+      )}
+      
+      {/* No image state */}
+      {!preview && !existingImageUrl && (
+        <div className="text-sm text-gray-500 text-center py-8 border border-dashed rounded-lg">
+          No image uploaded
+        </div>
+      )}
     </div>
   );
 };
@@ -181,27 +262,30 @@ export const EditCategoryModal = ({
                   <FormMessage />
                 </FormItem>
               )}
-            />
-            
-            <FormField
+            />              <FormField
               control={form.control}
               name="image"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image</FormLabel>
+                  <FormLabel>Category Image</FormLabel>
                   <FormControl>
-                    <ImageUpload
-                      value={imagePreview || ""}
-                      onChange={(file) => {
-                        field.onChange(file);
-                        if (file) {
-                          setImagePreview(URL.createObjectURL(file));
-                        }
-                      }}
-                    />
+                    <div>
+                      <ImageUpload
+                        value={field.value instanceof File ? field.value.name : ""}
+                        existingImageUrl={category.image || undefined}
+                        onChange={(file) => {
+                          field.onChange(file);
+                          if (file) {
+                            setImagePreview(URL.createObjectURL(file));
+                          } else {
+                            setImagePreview(category.image || null);
+                          }
+                        }}
+                      />
+                    </div>
                   </FormControl>
                   <FormDescription>
-                    Update category image (optional)
+                    Upload a new image to replace the current one (optional). Recommended size: 400x400px
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

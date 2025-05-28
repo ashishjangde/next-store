@@ -13,18 +13,18 @@ import {
 import { PromotionsService, CreatePromotionDto, UpdatePromotionDto } from './promotions.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles-decorator';
+import { Role } from '../../common/decorators/roles-decorator';
 import { PromotionStatus } from '@prisma/client';
+import ApiResponse from '../../common/responses/ApiResponse';
 
 @Controller('admin/promotions')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
+@UseGuards(JwtAuthGuard, RolesGuard)  @Role('ADMIN')
 export class PromotionsController {
   constructor(private readonly promotionsService: PromotionsService) {}
-
   @Post()
   async createPromotion(@Body() createPromotionDto: CreatePromotionDto, @Request() req) {
-    return this.promotionsService.createPromotion(createPromotionDto, req.user.id);
+    const promotion = await this.promotionsService.createPromotion(createPromotionDto, req.user.id);
+    return new ApiResponse(promotion);
   }
 
   @Get()
@@ -33,21 +33,24 @@ export class PromotionsController {
     @Query('limit') limit = '10',
     @Query('status') status?: PromotionStatus
   ) {
-    return this.promotionsService.getAllPromotions(
+    const result = await this.promotionsService.getAllPromotions(
       parseInt(page), 
       parseInt(limit), 
       status
     );
+    return new ApiResponse(result);
   }
 
   @Get('stats')
   async getPromotionStats() {
-    return this.promotionsService.getPromotionStats();
+    const stats = await this.promotionsService.getPromotionStats();
+    return new ApiResponse(stats);
   }
 
   @Get(':id')
   async getPromotionById(@Param('id') id: string) {
-    return this.promotionsService.getPromotionById(id);
+    const promotion = await this.promotionsService.getPromotionById(id);
+    return new ApiResponse(promotion);
   }
 
   @Put(':id')
@@ -55,13 +58,14 @@ export class PromotionsController {
     @Param('id') id: string, 
     @Body() updatePromotionDto: UpdatePromotionDto
   ) {
-    return this.promotionsService.updatePromotion(id, updatePromotionDto);
+    const promotion = await this.promotionsService.updatePromotion(id, updatePromotionDto);
+    return new ApiResponse(promotion);
   }
 
   @Delete(':id')
   async deletePromotion(@Param('id') id: string) {
     await this.promotionsService.deletePromotion(id);
-    return { message: 'Promotion deleted successfully' };
+    return new ApiResponse({ message: 'Promotion deleted successfully' });
   }
 }
 
@@ -77,10 +81,11 @@ export class PublicPromotionsController {
       orderAmount?: number; 
     }
   ) {
-    return this.promotionsService.validatePromotionCode(
+    const result = await this.promotionsService.validatePromotionCode(
       validateDto.code,
       validateDto.userId,
       validateDto.orderAmount
     );
+    return new ApiResponse(result);
   }
 }

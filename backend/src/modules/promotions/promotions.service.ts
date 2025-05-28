@@ -33,15 +33,20 @@ export interface PromotionUsageDto {
 @Injectable()
 export class PromotionsService {
   constructor(private prisma: PrismaService) {}
-
   async createPromotion(data: CreatePromotionDto, createdBy: string): Promise<Promotion> {
-    // Validate discount code uniqueness if provided
-    if (data.code) {
-      const existingPromotion = await this.prisma.promotion.findUnique({
-        where: { code: data.code }
-      });
-      if (existingPromotion) {
-        throw new BadRequestException('Promotion code already exists');
+    // Generate unique code if not provided or if code type promotion
+    let finalCode = data.code;
+    if (data.type === 'DISCOUNT_CODE') {
+      if (!finalCode) {
+        finalCode = await this.generateUniqueCode();
+      } else {
+        // Check for uniqueness
+        const existingPromotion = await this.prisma.promotion.findUnique({
+          where: { code: finalCode }
+        });
+        if (existingPromotion) {
+          throw new BadRequestException('Promotion code already exists');
+        }
       }
     }
 
@@ -50,28 +55,67 @@ export class PromotionsService {
       throw new BadRequestException('End date must be after start date');
     }
 
-    return this.prisma.promotion.create({
-      data: {
-        ...data,
-        created_by: createdBy,
-        applicable_categories: data.applicable_categories || [],
-        applicable_products: data.applicable_products || [],
-      },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
+    try {
+      return await this.prisma.promotion.create({
+        data: {
+          ...data,
+          code: finalCode,
+          created_by: createdBy,
+          applicable_categories: data.applicable_categories || [],
+          applicable_products: data.applicable_products || [],
         },
-        _count: {
-          select: {
-            usage_history: true
+        include: {
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+          _count: {
+            select: {
+              usage_history: true
+            }
           }
         }
+      });
+    } catch (error) {
+      if (error.code === 'P2002' && error.meta?.target?.includes('code')) {
+        throw new BadRequestException('Promotion code already exists');
       }
-    });
+      throw error;
+    }
+  }
+
+  private async generateUniqueCode(): Promise<string> {
+    let code: string;
+    let isUnique = false;
+    let attempts = 0;
+    const maxAttempts = 10;
+
+    while (!isUnique && attempts < maxAttempts) {
+      // Generate code like: PROMO2025052701, SAVE20A1, etc.
+      const prefix = 'PROMO';
+      const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+      const random = Math.random().toString(36).substring(2, 4).toUpperCase(); // 2 random chars
+      code = `${prefix}${timestamp}${random}`;
+
+      // Check if code exists
+      const existing = await this.prisma.promotion.findUnique({
+        where: { code }
+      });
+
+      if (!existing) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+
+    if (!isUnique) {
+      throw new Error('Failed to generate unique promotion code');
+    }
+
+    return code!;
   }
 
   async getAllPromotions(page = 1, limit = 10, status?: PromotionStatus) {

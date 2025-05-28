@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { UiActions, Category } from '@/api-actions/ui-actions';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface CategoryCarouselProps {
     categories?: Category[]; // Allow passing categories as props
@@ -16,25 +17,8 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
     const [totalSlides, setTotalSlides] = React.useState(0);
     const [categories, setCategories] = React.useState<Category[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
+    const [imageErrors, setImageErrors] = React.useState<Set<string>>(new Set());
 
-    // Fallback sample data with proper Category interface
-    const fallbackSlides: Category[] = [
-        { id: '1', name: 'Electronics', slug: 'electronics', is_active: true, level: 0, sort_order: 1, image_url: '/categories/electronics.svg' },
-        { id: '2', name: 'Fashion', slug: 'fashion', is_active: true, level: 0, sort_order: 2, image_url: '/categories/fashion.svg' },
-        { id: '3', name: 'Home', slug: 'home', is_active: true, level: 0, sort_order: 3, image_url: '/categories/home.svg' },
-        { id: '4', name: 'Sports', slug: 'sports', is_active: true, level: 0, sort_order: 4, image_url: '/categories/sports.svg' },
-        { id: '5', name: 'Books', slug: 'books', is_active: true, level: 0, sort_order: 5, image_url: '/categories/books.svg' },
-        { id: '6', name: 'Beauty', slug: 'beauty', is_active: true, level: 0, sort_order: 6, image_url: '/categories/beauty.svg' },
-        { id: '7', name: 'Toys', slug: 'toys', is_active: true, level: 0, sort_order: 7, image_url: '/categories/toys.svg' },
-        { id: '8', name: 'Groceries', slug: 'groceries', is_active: true, level: 0, sort_order: 8, image_url: '/categories/groceries.svg' },
-    ];
-
-    // Color palette for categories
-    const colorPalette = [
-        'bg-blue-600', 'bg-purple-600', 'bg-green-600', 'bg-red-600',
-        'bg-yellow-600', 'bg-pink-600', 'bg-indigo-600', 'bg-teal-600',
-        'bg-orange-600', 'bg-cyan-600', 'bg-lime-600', 'bg-amber-600'
-    ];    // Fetch categories from API only if not provided as props
     React.useEffect(() => {
         const fetchCategories = async () => {
             // If categories are provided as props, use them directly
@@ -49,13 +33,11 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                 if (response.data && response.data.length > 0) {
                     setCategories(response.data);
                 } else {
-                    // Use fallback data if API returns empty
-                    setCategories(fallbackSlides);
+                    setCategories([]);
                 }
             } catch (error) {
                 console.error('Failed to fetch categories:', error);
-                // Use fallback data if API fails
-                setCategories(fallbackSlides);
+                setCategories([]);
             } finally {
                 setIsLoading(false);
             }
@@ -65,17 +47,12 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
     }, [propCategories]);
 
     const slides = React.useMemo(() => {
-        if (categories.length === 0) return fallbackSlides;
-        
-        return categories.map((category, index) => ({
+        return categories.map((category) => ({
             ...category,
-            bgColor: colorPalette[index % colorPalette.length],
-            icon: category.image_url || '/categories/default.svg',
+            icon: category.image || '/categories/default.svg',
             productCount: category._count?.Products || 0
         }));
-    }, [categories]);
-
-    if (isLoading) {
+    }, [categories]);    if (isLoading) {
         return (
             <div className="w-full flex justify-center items-center py-12">
                 <div className="animate-pulse flex space-x-4">
@@ -85,6 +62,18 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                             <div className="w-16 h-4 bg-gray-300 rounded"></div>
                         </div>
                     ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (slides.length === 0) {
+        return (
+            <div className="w-full flex justify-center items-center py-12">
+                <div className="text-center text-gray-500">
+                    <Package className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No categories available</p>
+                    <p className="text-sm">Categories will appear here when they are added.</p>
                 </div>
             </div>
         );
@@ -121,33 +110,37 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                             key={slide.id} 
                             className="group h-32 relative"
                         >
-                            <Link href={`/categories/${slide.slug}`} className="w-full h-full flex flex-col items-center">
-                                <div
+                            <Link href={`/categories/${slide.slug}`} className="w-full h-full flex flex-col items-center">                                <div
                                     className={cn(
                                         "rounded-full shadow-lg w-20 h-20", 
                                         "flex items-center justify-center",
                                         "transition-all duration-500 ease-in-out",
                                         "transform hover:scale-110",
                                         "hover:shadow-xl cursor-pointer",
-                                        "overflow-hidden",
-                                        colorPalette[index % colorPalette.length],
+                                        "overflow-hidden relative",                                        "border-2 border-gray-100",
+                                        "bg-gray-200",
                                     )}
-                                >
-                                    {slide.image_url ? (
-                                        <img 
-                                            src={slide.image_url} 
+                                    style={{
+                                        borderRadius: '50%',
+                                        clipPath: 'circle(50% at 50% 50%)'
+                                    }}                                >{slide.image && !imageErrors.has(slide.id) ? (
+                                        <Image 
+                                            src={slide.image} 
                                             alt={slide.name}
-                                            className="w-10 h-10 object-contain invert"
-                                            onError={(e) => {
-                                                const target = e.target as HTMLImageElement;
-                                                target.style.display = 'none';
-                                                const parent = target.parentElement;
-                                                if (parent) {
-                                                    const icon = document.createElement('div');
-                                                    icon.innerHTML = '<svg class="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"></path></svg>';
-                                                    parent.appendChild(icon.firstChild as Node);
-                                                }
+                                            width={80}
+                                            height={80}
+                                            className="w-full h-full object-cover rounded-full"
+                                            style={{
+                                                clipPath: 'circle(50% at 50% 50%)',
+                                                objectPosition: 'center',
+                                                maxWidth: '100%',
+                                                maxHeight: '100%'
                                             }}
+                                            onError={() => {
+                                                // Add this image to error set so it shows fallback
+                                                setImageErrors(prev => new Set(prev).add(slide.id));
+                                            }}
+                                            unoptimized={slide.image?.endsWith('.svg')} // Don't optimize SVGs
                                         />
                                     ) : (
                                         <Package className="w-10 h-10 text-white" />

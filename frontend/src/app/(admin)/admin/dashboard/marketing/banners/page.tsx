@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BannerActions, Banner } from '@/api-actions/banner-actions';
 import { Button } from '@/components/ui/button';
@@ -55,8 +55,16 @@ export default function BannersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [previewBanner, setPreviewBanner] = useState<Banner | null>(null);
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+
+  // Close any open dropdowns when modals open
+  useEffect(() => {
+    if (isCreateModalOpen || isEditModalOpen || isDeleteModalOpen || previewBanner) {
+      setOpenDropdownId(null);
+    }
+  }, [isCreateModalOpen, isEditModalOpen, isDeleteModalOpen, previewBanner]);
 
   // Fetch banners
   const { data: bannersData, isLoading, error } = useQuery({
@@ -93,21 +101,22 @@ export default function BannersPage() {
       toast.error('Failed to delete banner');
     },
   });
-
   const banners = bannersData?.data?.banners || [];
   const totalPages = bannersData?.data?.totalPages || 1;
-
   const handleEdit = (banner: Banner) => {
+    setOpenDropdownId(null); // Close any open dropdown
     setSelectedBanner(banner);
     setIsEditModalOpen(true);
   };
 
   const handleDelete = (banner: Banner) => {
+    setOpenDropdownId(null); // Close any open dropdown
     setSelectedBanner(banner);
     setIsDeleteModalOpen(true);
   };
 
   const handlePreview = (banner: Banner) => {
+    setOpenDropdownId(null); // Close any open dropdown
     setPreviewBanner(banner);
   };
 
@@ -156,15 +165,17 @@ export default function BannersPage() {
   return (
     <div className="flex-col">
       <div className="flex-1 space-y-4 p-4 pt-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header */}        <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Banner Management</h2>
             <p className="text-muted-foreground">
               Manage promotional banners displayed on your website
             </p>
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
+          <Button onClick={() => {
+            setOpenDropdownId(null); // Close any open dropdown
+            setIsCreateModalOpen(true);
+          }}>
             <Plus className="mr-2 h-4 w-4" />
             Create Banner
           </Button>
@@ -176,8 +187,7 @@ export default function BannersPage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Banners</CardTitle>
               <ImageIcon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
+            </CardHeader>            <CardContent>
               <div className="text-2xl font-bold">{bannersData?.data?.total || 0}</div>
             </CardContent>
           </Card>
@@ -217,9 +227,11 @@ export default function BannersPage() {
                 <h3 className="mt-2 text-sm font-medium text-gray-900">No banners</h3>
                 <p className="mt-1 text-sm text-gray-500">
                   Get started by creating your first banner.
-                </p>
-                <div className="mt-6">
-                  <Button onClick={() => setIsCreateModalOpen(true)}>
+                </p>                <div className="mt-6">
+                  <Button onClick={() => {
+                    setOpenDropdownId(null); // Close any open dropdown
+                    setIsCreateModalOpen(true);
+                  }}>
                     <Plus className="mr-2 h-4 w-4" />
                     Create Banner
                   </Button>
@@ -298,9 +310,18 @@ export default function BannersPage() {
                           <User className="h-3 w-3" />
                           {banner.created_by_user?.username || banner.created_by_user?.email || 'Admin'}
                         </div>
-                      </TableCell>
+                      </TableCell>                      
                       <TableCell className="text-right">
-                        <DropdownMenu>
+                        <DropdownMenu 
+                          open={openDropdownId === banner.id}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setOpenDropdownId(banner.id);
+                            } else {
+                              setOpenDropdownId(null);
+                            }
+                          }}
+                        >
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
                               <MoreHorizontal className="h-4 w-4" />

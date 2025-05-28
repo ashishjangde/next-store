@@ -23,11 +23,11 @@ export default function CustomImageUpload({
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Convert value to array for consistent handling
-  const valueArray = Array.isArray(value) ? value : value ? [value] : [];
-
   // Generate preview URLs for existing images
   useEffect(() => {
+    // Convert value to array for consistent handling
+    const valueArray = Array.isArray(value) ? value : value ? [value] : [];
+    
     if (valueArray.length > 0) {
       // If values are already URLs, use them directly
       if (valueArray.every(v => typeof v === 'string' && (v.startsWith('http') || v.startsWith('data:')))) {
@@ -36,7 +36,7 @@ export default function CustomImageUpload({
     } else {
       setPreviews([]);
     }
-  }, [valueArray]);
+  }, [value]); // Changed from valueArray to value
 
   const validateFile = (file: File): boolean => {
     const maxSize = 5 * 1024 * 1024; // 5MB
@@ -116,11 +116,14 @@ export default function CustomImageUpload({
 
     setFiles(prev => {
       const newFiles = prev.filter((_, i) => i !== index);
-      if (multiple) {
-        onChange(newFiles);
-      } else {
-        onChange(null);
-      }
+      // Move onChange outside to avoid setState in render
+      setTimeout(() => {
+        if (multiple) {
+          onChange(newFiles);
+        } else {
+          onChange(null);
+        }
+      }, 0);
       return newFiles;
     });
   };

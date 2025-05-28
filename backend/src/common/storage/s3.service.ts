@@ -2,9 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { 
   S3Client, 
   DeleteObjectCommand, 
+  PutObjectCommand,
   S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import ConfigService from '../config/config.service';
+import { generateFileName } from '../utils/file-upload.util';
 
 @Injectable()
 export class S3Service {
@@ -63,6 +65,27 @@ export class S3Service {
     }
   }
   
+
+  async uploadFile(file: Express.Multer.File, folder: string): Promise<string> {
+    try {
+      const fileName = generateFileName(file.originalname);
+      const uploadPath = `${folder}/${fileName}`;
+
+      const command = new PutObjectCommand({
+        Bucket: this.bucketName,
+        Key: uploadPath,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+        ACL: 'public-read'
+      });
+
+      await this.s3Client.send(command);
+      return this.getFileUrl(uploadPath);
+    } catch (error) {
+      this.logger.error(`Failed to upload file: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 
   async deleteFile(url: string): Promise<boolean> {
     try {

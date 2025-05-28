@@ -39,20 +39,14 @@ export class UiService {
       newProducts
     };
   }
-
   async getActiveBanners() {
-    return this.bannerRepository.findAll({
-      includeInactive: false,
-      includeCreator: false
-    });
-  }
-  async getCategoriesWithFeaturedProducts() {
-    // Get only featured categories with product counts
+    return this.bannerRepository.findActiveForPublic();
+  }  async getCategoriesWithFeaturedProducts() {
+    // Get featured categories of any level with product counts
     const categories = await this.prisma.category.findMany({
       where: {
-        is_active: true,
-        is_featured: true, // Only featured categories
-        level: 0, // Root categories
+        active: true,
+        is_featured: true, // Only featured categories (any level)
       },
       take: 12,
       orderBy: { 
@@ -60,24 +54,23 @@ export class UiService {
       },
       include: {
         _count: {
-          select: { Products: true }
+          select: { products: true }
         }
       }
     });
 
     return categories;
   }
-
   async getFeaturedProductsByCategory() {
     // Get featured products grouped by category
     const categories = await this.prisma.category.findMany({
       where: {
-        is_active: true,
+        active: true,
         level: 2, // Only level 2 categories can have products
       },
       take: 6,
       include: {
-        Products: {
+        products: {
           where: {
             is_active: true,
             archived: false,
@@ -95,7 +88,7 @@ export class UiService {
       }
     });
 
-    return categories.filter(category => category.Products.length > 0);
+    return categories.filter(category => category.products.length > 0);
   }
 
   async getTrendingProducts() {
@@ -146,12 +139,10 @@ export class UiService {
 
     if (userHistory.length === 0) {
       return this.getNewProducts(6);
-    }
-
-    // Get categories from user's history
+    }    // Get categories from user's history
     const categoryIds = userHistory
       .map(h => h.Product.category_id)
-      .filter(Boolean)
+      .filter((id): id is string => id !== null)
       .slice(0, 3);
 
     if (categoryIds.length === 0) {
@@ -256,12 +247,11 @@ export class UiService {
       console.log('Error recording product view:', error);
     }
   }
-
   async getCategoryPageData(categorySlug: string) {
     const category = await this.prisma.category.findUnique({
       where: { slug: categorySlug },
       include: {
-        Products: {
+        products: {
           where: {
             is_active: true,
             archived: false,
@@ -276,7 +266,7 @@ export class UiService {
           }
         },
         children: {
-          where: { is_active: true }
+          where: { active: true }
         }
       }
     });

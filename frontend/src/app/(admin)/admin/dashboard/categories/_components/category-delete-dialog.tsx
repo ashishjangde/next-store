@@ -71,15 +71,12 @@ export function CategoryDeleteDialog({ children, category, redirectAfterDelete =
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Category</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>Delete Category</DialogTitle>          <DialogDescription>
             Are you sure you want to delete the category &quot;{category.name}&quot;? This action cannot be undone.
             {category.children && category.children.length > 0 && (
-              <div className="mt-2">
-                <span className="text-red-500 font-medium">
-                  Warning: This category has {category.children.length} child categories that will also be affected.
-                </span>
-              </div>
+              <span className="block mt-2 text-red-500 font-medium">
+                Warning: This category has {category.children.length} child categories that will also be affected.
+              </span>
             )}
           </DialogDescription>
         </DialogHeader>

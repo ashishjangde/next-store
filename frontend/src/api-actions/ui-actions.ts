@@ -22,7 +22,7 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
-  image_url?: string;
+  image?: string; // Changed from image_url to image to match backend
   is_active: boolean;
   level: number;
   sort_order: number;

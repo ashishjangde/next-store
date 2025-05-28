@@ -37,12 +37,38 @@ export class BannersService {
 
     return this.bannerRepository.create(bannerData);
   }
+  async getAllBanners(
+    includeInactive = false,
+    page = 1,
+    limit = 10,
+  ): Promise<{
+    banners: Banner[];
+    total: number;
+    page: number;
+    totalPages: number;
+    limit: number;
+  }> {
+    const offset = (page - 1) * limit;
+    
+    const [banners, total] = await Promise.all([
+      this.bannerRepository.findAll({ 
+        includeInactive, 
+        includeCreator: true,
+        limit,
+        offset,
+      }),
+      this.bannerRepository.count({ includeInactive }),
+    ]);
 
-  async getAllBanners(includeInactive = false): Promise<Banner[]> {
-    return this.bannerRepository.findAll({ 
-      includeInactive, 
-      includeCreator: true 
-    });
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      banners,
+      total,
+      page,
+      totalPages,
+      limit,
+    };
   }
 
   async getBannerById(id: string): Promise<Banner> {
@@ -101,8 +127,15 @@ export class BannersService {
 
     await this.bannerRepository.delete(id);
   }
-
-  async getActiveBannersForPublic(): Promise<Banner[]> {
+  async getActiveBannersForPublic(): Promise<{
+    id: string;
+    title: string;
+    description: string | null;
+    image_url: string;
+    sort_order: number;
+    created_at: Date;
+    updated_at: Date;
+  }[]> {
     return this.bannerRepository.findActiveForPublic();
   }
 

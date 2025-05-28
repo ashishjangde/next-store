@@ -76,14 +76,25 @@ export class BannersController {
     const banner = await this.bannersService.createBanner(createBannerDto, image, user.id);
     return new ApiResponseClass(banner);
   }
-
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Role(Roles.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get all banners (Admin only)',
-    description: 'Retrieve all banners with optional filtering. Only admins can access this endpoint.',
+    description: 'Retrieve all banners with optional filtering and pagination. Only admins can access this endpoint.',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number for pagination (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Number of items per page (default: 10)',
   })
   @ApiQuery({
     name: 'include_inactive',
@@ -96,9 +107,19 @@ export class BannersController {
     description: 'Banners retrieved successfully',
     schema: ApiCustomResponse([BannerResponseDto]),
   })
-  async getAllBanners(@Query('include_inactive') includeInactive?: string) {
-    const banners = await this.bannersService.getAllBanners(includeInactive === 'true');
-    return new ApiResponseClass(banners);
+  async getAllBanners(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('include_inactive') includeInactive?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    const result = await this.bannersService.getAllBanners(
+      includeInactive === 'true',
+      pageNum,
+      limitNum,
+    );
+    return new ApiResponseClass(result);
   }
 
   @Get('public')

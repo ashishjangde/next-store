@@ -60,7 +60,6 @@ export const EditBannerModal = ({
       sort_order: 1,
     },
   });
-
   // Reset form when banner changes
   useEffect(() => {
     if (banner && open) {
@@ -74,7 +73,7 @@ export const EditBannerModal = ({
       setImagePreview(banner.image_url);
       setHasNewImage(false);
     }
-  }, [banner, open, form]);
+  }, [banner, open]); // Removed 'form' from dependency array
 
   const { mutate: updateBanner, isPending } = useMutation({
     mutationFn: (data: FormData) => {

@@ -363,9 +363,9 @@ export default function EditPromotionModal({ open, onClose, onSuccess, promotion
             <Button type="submit" disabled={loading}>
               {loading ? 'Updating...' : 'Update Promotion'}
             </Button>
-          </DialogFooter>
-        </form>
+          </DialogFooter>        </form>
       </DialogContent>
     </Dialog>
   );
 }
+

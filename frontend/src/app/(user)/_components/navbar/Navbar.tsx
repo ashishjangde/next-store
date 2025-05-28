@@ -239,6 +239,11 @@ export default function NavbarHome() {
   const hasRole = useAuthStore(state => state.hasRole)
   const isVendor = useMemo(() => hasRole(['VENDOR']), [hasRole])
   const isAdmin = useMemo(() => hasRole(['ADMIN']), [hasRole])
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   return (
     <nav className="px-4 md:px-6 py-2 flex fixed top-0 w-full items-center h-[70px] justify-between 
@@ -260,22 +265,21 @@ export default function NavbarHome() {
         </div>
 
         {/* Right section */}
-        <div className="flex items-center space-x-2">
-          {/* Primary navigation */}
+        <div className="flex items-center space-x-2">          {/* Primary navigation */}
           <div className="hidden md:flex items-center space-x-2">
-            {isAdmin && (
+            {isHydrated && isAdmin && (
               <Link href="/admin/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-accent text-sm">
                 <LayoutDashboard size={18} className="text-primary" />
                 <span>Admin Panel</span>
               </Link>
             )}
-            {!isVendor && (
+            {isHydrated && !isVendor && (
               <Link href="/vendor-request" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-accent text-sm">
                 <Store size={18} />
                 <span>Become a Seller</span>
               </Link>
             )}
-            {isVendor && (
+            {isHydrated && isVendor && (
               <Link href="/vendor/dashboard" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full hover:bg-accent text-sm">
                 <TrendingUp size={18} className="text-green-600" />
                 <span>Dashboard</span>
