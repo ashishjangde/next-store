@@ -27,24 +27,43 @@ export default function Home() {
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
   });
-
   if (isLoading) {
     return (
       <div className="flex flex-col min-h-screen">
         {/* Hero Section with Loading */}
         <div className="w-screen">
-          <div className="h-64 bg-gray-200 animate-pulse"></div>
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-pulse flex space-x-4">
-              {[...Array(6)].map((_, i) => (
+          <div className="h-64 md:h-96 bg-gray-200 animate-pulse"></div>
+          <div className="flex flex-col items-center justify-center py-12 bg-white">
+            <div className="animate-pulse flex justify-between w-full px-4 max-w-7xl mx-auto">
+              {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex flex-col items-center">
-                  <div className="w-20 h-20 bg-gray-300 rounded-full mb-2"></div>
-                  <div className="w-16 h-4 bg-gray-300 rounded"></div>
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gray-300 rounded-full mb-2"></div>
+                  <div className="w-12 h-3 md:w-16 md:h-4 bg-gray-300 rounded"></div>
                 </div>
               ))}
             </div>
           </div>
         </div>
+        
+        {/* Content Loading */}
+        <main className="bg-gray-50 min-h-screen">
+          <div className="container mx-auto px-4 py-12 space-y-16">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm animate-pulse">
+                <div className="h-8 bg-gray-300 rounded w-1/3 mb-4"></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="space-y-3">
+                      <div className="aspect-square bg-gray-300 rounded-lg"></div>
+                      <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                      <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -56,115 +75,124 @@ export default function Home() {
         <div className="flex flex-col items-center justify-center">
           <CategoryCrousal categories={homeData?.categories} /> 
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8 space-y-12">
-        
-        {/* Featured Products by Category */}
-        {homeData?.featuredProducts && homeData.featuredProducts.length > 0 && (
-          <FeaturedCategorySection 
-            categories={homeData.featuredProducts} 
-            className="mb-12"
-          />
-        )}
-
-        {/* Trending Products Section */}
-        {homeData?.trendingProducts && homeData.trendingProducts.length > 0 && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-red-50 to-pink-50 border-b">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-6 w-6 text-red-600" />
-                  <CardTitle className="text-2xl text-gray-900">
-                    Trending Products
-                  </CardTitle>
+      </div>      {/* Main Content */}
+      <main className="bg-gray-50 min-h-screen">
+        <div className="container mx-auto px-4 py-12 space-y-16">
+          
+          {/* Featured Products by Category */}
+          {homeData?.featuredProducts && homeData.featuredProducts.length > 0 && (
+            <FeaturedCategorySection 
+              categories={homeData.featuredProducts} 
+              className="mb-16"
+            />
+          )}{/* Trending Products Section */}
+        {homeData?.trendingProducts && homeData.trendingProducts.length > 0 && (          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-8 bg-gradient-to-b from-slate-600 to-slate-800 rounded-full"></div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                    Trending Now
+                  </h2>
                 </div>
-                <Link href="/products?sort=trending">
-                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                    View All
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </Link>
+                <p className="text-gray-600 text-sm md:text-base">Discover what's popular with our customers</p>
               </div>
-              <p className="text-gray-600 mt-1">Most popular products right now</p>
-            </CardHeader>
-            <CardContent className="p-6">
-              <ProductGrid 
-                products={homeData.trendingProducts} 
-                columns={4}
-                showAddToCart={true}
-                showWishlist={true}
-              />
-            </CardContent>
-          </Card>
+              <Link href="/products?sort=trending">
+                <Button variant="outline" className="hidden sm:flex items-center gap-2 border-gray-300 hover:border-gray-400 transition-colors">
+                  View All
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            <ProductGrid 
+              products={homeData.trendingProducts} 
+              columns={4}
+              showAddToCart={true}
+              showWishlist={true}
+              className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm"
+            />
+            {/* Mobile View All Button */}
+            <div className="flex sm:hidden justify-center">
+              <Link href="/products?sort=trending">
+                <Button variant="outline" className="flex items-center gap-2 border-gray-300 hover:border-gray-400 transition-colors">
+                  View All Trending Products
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </section>
         )}
 
         {/* New Products Section */}
-        {homeData?.newProducts && homeData.newProducts.length > 0 && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-6 w-6 text-green-600" />
-                  <CardTitle className="text-2xl text-gray-900">
+        {homeData?.newProducts && homeData.newProducts.length > 0 && (          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-8 bg-gradient-to-b from-emerald-500 to-emerald-700 rounded-full"></div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
                     New Arrivals
-                  </CardTitle>
+                  </h2>
                 </div>
-                <Link href="/products?sort=newest">
-                  <Button variant="ghost" size="sm" className="text-green-600 hover:text-green-700">
-                    View All
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </Link>
+                <p className="text-gray-600 text-sm md:text-base">Fresh products just added to our collection</p>
               </div>
-              <p className="text-gray-600 mt-1">Fresh products just added to our store</p>
-            </CardHeader>
-            <CardContent className="p-6">
-              <ProductGrid 
-                products={homeData.newProducts} 
-                columns={6}
-                showAddToCart={true}
-                showWishlist={true}
-              />
-            </CardContent>
-          </Card>
+              <Link href="/products?sort=newest">
+                <Button variant="outline" className="hidden sm:flex items-center gap-2 border-gray-300 hover:border-gray-400 transition-colors">
+                  View All
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            <ProductGrid 
+              products={homeData.newProducts} 
+              columns={6}
+              showAddToCart={true}
+              showWishlist={true}
+              className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm"
+            />
+            {/* Mobile View All Button */}
+            <div className="flex sm:hidden justify-center">
+              <Link href="/products?sort=newest">
+                <Button variant="outline" className="flex items-center gap-2 border-gray-300 hover:border-gray-400 transition-colors">
+                  View All New Arrivals
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </section>
         )}
 
         {/* Personalized Suggestions Section (if user is logged in) */}
         {homeData?.suggestions && homeData.suggestions.length > 0 && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Star className="h-6 w-6 text-purple-600" />
-                  <CardTitle className="text-2xl text-gray-900">
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full"></div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
                     Recommended for You
-                  </CardTitle>
+                  </h2>
                 </div>
+                <p className="text-gray-600 text-sm md:text-base">Personalized picks based on your preferences</p>
               </div>
-              <p className="text-gray-600 mt-1">Based on your browsing history and preferences</p>
-            </CardHeader>
-            <CardContent className="p-6">
-              <ProductGrid 
-                products={homeData.suggestions} 
-                columns={4}
-                showAddToCart={true}
-                showWishlist={true}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Fallback message if no data */}
+            </div>
+            <ProductGrid 
+              products={homeData.suggestions} 
+              columns={4}
+              showAddToCart={true}
+              showWishlist={true}
+              className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm"
+            />
+          </section>
+        )}        {/* Fallback message if no data */}
         {!homeData && !isLoading && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">
+          <div className="text-center py-16 bg-white rounded-xl border border-gray-100 shadow-sm">
+            <p className="text-gray-500 text-lg">
               Unable to load home page content. Please try again later.
             </p>
           </div>
         )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

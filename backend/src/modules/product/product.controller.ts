@@ -122,6 +122,40 @@ export class ProductController {
    
   }
 
+  @Get('slug/:slug')
+  @ApiOperation({
+    summary: 'Get product by slug',
+    description: 'Retrieve a single product by its slug with optional includes for category, attributes, and children',
+  })
+  @ApiParam({ name: 'slug', description: 'Product slug' })
+  @ApiQuery({ name: 'include_category', required: false, type: Boolean, description: 'Include category details' })
+  @ApiQuery({ name: 'include_attributes', required: false, type: Boolean, description: 'Include product attributes' })
+  @ApiQuery({ name: 'include_children', required: false, type: Boolean, description: 'Include child products/variants' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Product retrieved successfully',
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: 'Product not found',
+    schema: ApiCustomErrorResponse(HttpStatus.NOT_FOUND, 'Product not found'),
+  })
+  async getProductBySlug(
+    @Param('slug') slug: string,
+    @Query('include_category') includeCategory: string = 'false',
+    @Query('include_attributes') includeAttributes: string = 'false',
+    @Query('include_children') includeChildren: string = 'false',
+  ) {
+    const product = await this.productService.getProductBySlug(
+      slug,
+      includeCategory === 'true',
+      includeAttributes === 'true',
+      includeChildren === 'true'
+    );
+
+    return new ApiResponseClass(product);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get product by ID or slug',

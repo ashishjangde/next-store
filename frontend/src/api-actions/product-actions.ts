@@ -120,6 +120,38 @@ export const ProductActions = {
   },
 
   /**
+   * Get a product by slug
+   * @param slug Product slug
+   * @param includeOptions Additional data to include
+   * @param cookies Optional cookies for server-side requests
+   * @returns The requested product
+   */
+  getProductBySlug: async (
+    slug: string,
+    includeOptions: {
+      include_category?: boolean;
+      include_attributes?: boolean;
+      include_children?: boolean;
+    } = {},
+    cookies?: string
+  ): Promise<ApiResponse<Product>> => {
+    const queryParams = new URLSearchParams();
+    
+    if (includeOptions.include_category) queryParams.append('include_category', 'true');
+    if (includeOptions.include_attributes) queryParams.append('include_attributes', 'true');
+    if (includeOptions.include_children) queryParams.append('include_children', 'true');
+    
+    const response = await axiosInstance.get<ApiResponse<Product>>(
+      `/products/slug/${slug}?${queryParams.toString()}`,
+      {
+        headers: cookies ? { Cookie: cookies } : {},
+      }
+    );
+    
+    return response.data;
+  },
+
+  /**
    * Update an existing product
    * @param id Product ID
    * @param productData Updated product data

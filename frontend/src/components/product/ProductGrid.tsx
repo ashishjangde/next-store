@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Product } from '@/api-actions/ui-actions';
+import { Product } from '@/types/product';
 import { ProductCard } from './ProductCard';
 
 interface ProductGridProps {
@@ -12,6 +12,14 @@ interface ProductGridProps {
   showAddToCart?: boolean;
   showWishlist?: boolean;
   className?: string;
+  isAuthenticated?: boolean;
+  getIsInCart?: (productId: string) => boolean;
+  getIsInWishlist?: (productId: string) => boolean;
+  getCartQuantity?: (productId: string) => number;
+  onAddToCart?: (productId: string, quantity: number) => Promise<void>;
+  onUpdateCartQuantity?: (productId: string, quantity: number) => Promise<void>;
+  onAddToWishlist?: (productId: string) => Promise<void>;
+  onRemoveFromWishlist?: (productId: string) => Promise<void>;
 }
 
 export function ProductGrid({ 
@@ -21,14 +29,21 @@ export function ProductGrid({
   columns = 4,
   showAddToCart = true,
   showWishlist = true,
-  className = '' 
-}: ProductGridProps) {
-  const getGridClass = () => {
+  className = '',
+  isAuthenticated = false,
+  getIsInCart,
+  getIsInWishlist,
+  getCartQuantity,
+  onAddToCart,
+  onUpdateCartQuantity,
+  onAddToWishlist,
+  onRemoveFromWishlist
+}: ProductGridProps) {const getGridClass = () => {
     switch (columns) {
       case 2:
-        return 'grid-cols-1 md:grid-cols-2';
+        return 'grid-cols-1 sm:grid-cols-2';
       case 3:
-        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
       case 4:
         return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
       case 6:
@@ -37,35 +52,40 @@ export function ProductGrid({
         return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
     }
   };
-
   if (!products || products.length === 0) {
     return (
-      <div className={`text-center py-8 ${className}`}>
-        <p className="text-gray-500">No products available</p>
+      <div className={`text-center py-16 bg-white rounded-xl border border-gray-100 shadow-sm ${className}`}>
+        <p className="text-gray-500 text-lg">No products available</p>
       </div>
     );
   }
-
   return (
     <div className={className}>
       {/* Header */}
       {title && (
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
+        <div className="mb-8 space-y-2">
+          <h2 className="text-3xl font-bold text-gray-900">{title}</h2>
           {description && (
-            <p className="text-gray-600">{description}</p>
+            <p className="text-gray-600 text-lg">{description}</p>
           )}
         </div>
       )}
 
-      {/* Products Grid */}
-      <div className={`grid gap-4 ${getGridClass()}`}>
+      {/* Products Grid */}      <div className={`grid gap-6 ${getGridClass()}`}>
         {products.map((product) => (
           <ProductCard
             key={product.id}
             product={product}
             showAddToCart={showAddToCart}
             showWishlist={showWishlist}
+            isAuthenticated={isAuthenticated}
+            isInCart={getIsInCart ? getIsInCart(product.id) : false}
+            isInWishlist={getIsInWishlist ? getIsInWishlist(product.id) : false}
+            cartQuantity={getCartQuantity ? getCartQuantity(product.id) : 0}
+            onAddToCart={onAddToCart}
+            onUpdateCartQuantity={onUpdateCartQuantity}
+            onAddToWishlist={onAddToWishlist}
+            onRemoveFromWishlist={onRemoveFromWishlist}
           />
         ))}
       </div>

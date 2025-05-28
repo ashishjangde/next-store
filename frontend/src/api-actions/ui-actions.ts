@@ -4,6 +4,7 @@
  */
 
 import axiosInstance from "@/hooks/custom-axios-interceptor";
+import { Product } from "@/types/product";
 
 // Types for UI data
 export interface Banner {
@@ -28,24 +29,6 @@ export interface Category {
   sort_order: number;
   _count?: {
     Products: number;
-  };
-}
-
-export interface Product {
-  id: string;
-  title: string;
-  slug: string;
-  description?: string;
-  images: string[];
-  is_active: boolean;
-  category?: Category;
-  Inventory?: {
-    price: number;
-    discount_price?: number;
-    quantity: number;
-  };
-  _count?: {
-    OrderItems: number;
   };
 }
 

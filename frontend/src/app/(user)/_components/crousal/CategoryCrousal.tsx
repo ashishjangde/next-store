@@ -56,8 +56,8 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
     if (isLoading) {
         return (
             <div className="w-full flex justify-center items-center py-12">
-                <div className="animate-pulse flex space-x-4">
-                    {[...Array(6)].map((_, i) => (
+                <div className="animate-pulse flex space-x-44">
+                    {[...Array(12)].map((_, i) => (
                         <div key={i} className="flex flex-col items-center">
                             <div className="w-20 h-20 bg-gray-300 rounded-full mb-2"></div>
                             <div className="w-16 h-4 bg-gray-300 rounded"></div>

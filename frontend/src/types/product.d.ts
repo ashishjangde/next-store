@@ -13,6 +13,7 @@ export interface Product {
   slug: string;
   sku?: string;
   price: number;
+  discount_price?: number; // Optional discount price for future use
   images?: string[];
   parent_id?: string;
   brand?: string;
