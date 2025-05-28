@@ -68,11 +68,10 @@ export const CategoryColumns: ColumnDef<Category>[] = [
         Name
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
-    ),
-    cell: ({ row }) => (
+    ),    cell: ({ row }) => (
       <div className="font-medium">
         <Link
-          href={`/admin/dashboard/categories/${row.original.id}`}
+          href={`/admin/categories/${row.original.id}`}
           className="hover:underline text-blue-600"
         >
           {row.getValue("name")}
@@ -83,11 +82,10 @@ export const CategoryColumns: ColumnDef<Category>[] = [
   {
     accessorKey: "parent",
     header: "Parent Category",
-    cell: ({ row }) => {
-      const parent = row.original.parent;
+    cell: ({ row }) => {      const parent = row.original.parent;
       return parent ? (
         <Link
-          href={`/admin/dashboard/categories/${parent.id}`}
+          href={`/admin/categories/${parent.id}`}
           className="hover:underline text-blue-600"
         >
           {parent.name}

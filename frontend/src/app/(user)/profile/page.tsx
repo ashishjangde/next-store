@@ -1,20 +1,11 @@
-import React from 'react';
-import { SessionActions, Session } from '@/api-actions/session-actions';
-import { cookies } from 'next/headers';
-import ProfilePageClientContent from './profile-client';
+
 
 export default async function ProfilePage() {
-  const cookieStore = await cookies();
-  const allCookies = cookieStore
-    .getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
-    .join('; ');
-
-
-    const sessionsResponse = await SessionActions.getSessions(allCookies);
-    const sessions = sessionsResponse.data?.sessions || [];
-
-
-    return <ProfilePageClientContent sessions={sessions}/>;
-
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <h1 className="text-2xl font-bold mb-4">User Profile</h1>
+      <p className="text-lg">This is your profile page.</p>
+      <p className="text-sm text-gray-500">More features coming soon!</p>
+    </div>
+  );
 }

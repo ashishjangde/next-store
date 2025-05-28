@@ -96,9 +96,8 @@ export const CategoryDetailsTab = ({ category }: CategoryDetailsTabProps) => {
             <CardTitle>Parent Category</CardTitle>
           </CardHeader>
           <CardContent>
-            {category.parent ? (
-              <Link
-                href={`/admin/dashboard/categories/${category.parent.id}`}
+            {category.parent ? (              <Link
+                href={`/admin/categories/${category.parent.id}`}
                 className="text-blue-600 hover:underline flex items-center gap-2"
               >
                 {category.parent.name}

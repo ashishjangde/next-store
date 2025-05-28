@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { AttributesClient } from "@/app/(admin)/admin/dashboard/attributes/_components/attributes-client";
+import { AttributesClient } from "./_components/attributes-client";
 
 export const metadata: Metadata = {
   title: "Attributes Management | Admin Dashboard",

@@ -33,12 +33,10 @@ import Link from "next/link"
 
 // This is sample data.
 const data = {
-  navMain: [
-    {
+  navMain: [    {
       title: "Dashboard",
       url: "dashboard",
       icon: LayoutDashboard,
-      isActive: true,
       items: [
         {
           title: "Overview",
@@ -52,7 +50,7 @@ const data = {
     },
     {
       title: "Product Management",
-      url: "/vendor/dashboard/products",
+      url: "products",
       icon: Package,
       items: [
         {
@@ -64,10 +62,9 @@ const data = {
           url: "/vendor/products/new",
         }
       ],
-    },
-    {
+    },    {
       title: "Orders Management",
-      url: "/vendor/orders",
+      url: "orders",
       icon: ShoppingCart,
       items: [
         {
@@ -94,7 +91,7 @@ const data = {
     },
     {
       title: "Payments & Settlements",
-      url: "/vendor/payments",
+      url: "payments",
       icon: CreditCard,
       items: [
         {
@@ -113,7 +110,7 @@ const data = {
     },
     {
       title: "Returns & Claims",
-      url: "/vendor/returns",
+      url: "returns",
       icon: RefreshCcw,
       items: [
         {
@@ -125,10 +122,9 @@ const data = {
           url: "/vendor/returns/disputes",
         },
       ],
-    },
-    {
+    },    {
       title: "Settings",
-      url: "/vendor/settings",
+      url: "settings",
       icon: Settings2,
       items: [
         {

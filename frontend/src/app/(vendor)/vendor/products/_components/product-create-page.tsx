@@ -161,16 +161,16 @@ export const ProductCreatePage = () => {
         
       if (isUpdate) {
         toast.success("Product updated successfully");
-        router.push(`/vendor/dashboard/products/${updateProductId}`);
+        router.push(`/vendor/products/${updateProductId}`);
       } else if (isVariant) {
         toast.success("Product variant created successfully");
         // Navigate back to parent product
-        router.push(`/vendor/dashboard/products/${parentId}`);
+        router.push(`/vendor/products/${parentId}`);
       } else {
         toast.success("Product created successfully");
         // Navigate to the newly created product
         if (data?.data?.id) {
-          router.push(`/vendor/dashboard/products/${data.data.id}`);
+          router.push(`/vendor/products/${data.data.id}`);
         }
       }
     },

@@ -110,10 +110,10 @@ export const CategoryDetailClient = ({
           }
           description={category.description || "No description provided"}
           actions={
-            <div className="flex gap-2">
-              <Button
+            <div className="flex gap-2">              
+            <Button
                 variant="outline"
-                onClick={() => router.push("/admin/dashboard/categories")}
+                onClick={() => router.push("/admin/categories")}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back

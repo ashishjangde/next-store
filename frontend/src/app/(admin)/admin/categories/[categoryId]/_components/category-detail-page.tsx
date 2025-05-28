@@ -17,9 +17,8 @@ export function CategoryDetailPage({ categoryId }: CategoryDetailPageProps) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const fetchCategory = async () => {
-      if (!categoryId) {
-        router.push('/admin/dashboard/categories');
+    const fetchCategory = async () => {      if (!categoryId) {
+        router.push('/admin/categories');
         return;
       }
       
@@ -29,7 +28,7 @@ export function CategoryDetailPage({ categoryId }: CategoryDetailPageProps) {
         
         if (!response?.data) {
           // Handle 404 case
-          router.push('/admin/dashboard/categories');
+          router.push('/admin/categories');
           return;
         }
         
@@ -49,10 +48,9 @@ export function CategoryDetailPage({ categoryId }: CategoryDetailPageProps) {
   if (isLoading) {
     return <LoadingPage />;
   }
-
   // Handle error state
   if (error || !category) {
-    router.push('/admin/dashboard/categories');
+    router.push('/admin/categories');
     return <LoadingPage />;
   }
 

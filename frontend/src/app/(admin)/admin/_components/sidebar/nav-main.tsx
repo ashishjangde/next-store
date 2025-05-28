@@ -40,10 +40,12 @@ export function NavMain({
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel className="text-sidebar-foreground/70 font-medium">Platform</SidebarGroupLabel>
-      <SidebarMenu>
+      <SidebarGroupLabel className="text-sidebar-foreground/70 font-medium">Platform</SidebarGroupLabel>      <SidebarMenu>
         {items.map((item) => {
-          const isItemActive = item.isActive || pathname.includes(`/${item.url}`)
+          // Check if current path matches this navigation item
+          const isItemActive = item.isActive || 
+            pathname.includes(`/admin/${item.url}`) ||
+            item.items?.some(subItem => pathname === subItem.url)
           
           return (
             <Collapsible

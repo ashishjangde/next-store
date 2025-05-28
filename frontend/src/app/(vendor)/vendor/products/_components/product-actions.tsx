@@ -92,14 +92,14 @@ export const ProductActions = ({ product, isVariant = false }: ProductActionsPro
           
           <DropdownMenuItem onClick={() => {
             setDropdownOpen(false);
-            router.push(`/vendor/dashboard/products/${product.id}`);
+            router.push(`/vendor/products/${product.id}`);
           }}>
             <Edit className="mr-2 h-4 w-4" />
             View
           </DropdownMenuItem>
             <DropdownMenuItem onClick={() => {
             setDropdownOpen(false);
-            router.push(`/vendor/dashboard/products/new?update=${product.id}`);
+            router.push(`/vendor/products/new?update=${product.id}`);
           }}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
@@ -108,7 +108,7 @@ export const ProductActions = ({ product, isVariant = false }: ProductActionsPro
           {!isVariant && (
             <DropdownMenuItem onClick={() => {
               setDropdownOpen(false);
-              router.push(`/vendor/dashboard/products/${product.id}/variants`);
+              router.push(`/vendor/products/${product.id}/variants`);
             }}>
               <PackageOpen className="mr-2 h-4 w-4" />
               Manage Variants
@@ -117,7 +117,7 @@ export const ProductActions = ({ product, isVariant = false }: ProductActionsPro
           
           <DropdownMenuItem onClick={() => {
             setDropdownOpen(false);
-            router.push(`/vendor/dashboard/products/${product.id}/inventory`);
+            router.push(`/vendor/products/${product.id}/inventory`);
           }}>
             <Tag className="mr-2 h-4 w-4" />
             Update Inventory
@@ -127,7 +127,7 @@ export const ProductActions = ({ product, isVariant = false }: ProductActionsPro
             onClick={() => {
               setDropdownOpen(false);
               toast.success("Product duplicated. Edit the copy now.");
-              router.push(`/vendor/dashboard/products/new?duplicate=${product.id}`);
+              router.push(`/vendor/products/new?duplicate=${product.id}`);
             }}
           >
             <Copy className="mr-2 h-4 w-4" />

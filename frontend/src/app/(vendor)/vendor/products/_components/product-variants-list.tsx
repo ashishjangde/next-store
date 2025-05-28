@@ -84,7 +84,7 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
               Manage variants for {product.title}
             </CardDescription>
           </div>
-          <Button onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}>
+          <Button onClick={() => router.push(`/vendor/products/new?parent_id=${productId}`)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Variant
           </Button>
@@ -101,7 +101,7 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                   Create variants based on attributes like color, size, or material to give your customers options.
                 </p>
               </div>              
-              <Button onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}>
+              <Button onClick={() => router.push(`/vendor/products/new?parent_id=${productId}`)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Your First Variant
               </Button>
@@ -142,7 +142,7 @@ export const ProductVariantsList = ({ productId }: ProductVariantsListProps) => 
                       <TableCell>
                         <div 
                           className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer hover:underline transition-colors"
-                          onClick={() => router.push(`/vendor/dashboard/products/${variant.id}`)}
+                          onClick={() => router.push(`/vendor/products/${variant.id}`)}
                         >
                           {variant.title}
                         </div>

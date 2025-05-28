@@ -143,7 +143,7 @@ export const ProductsClient = () => {
         </div>
         
         {/* Add Product Button */}
-        <Link href="/vendor/dashboard/products/new">
+        <Link href="/vendor/products/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             Add Product

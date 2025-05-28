@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { LoadingPage } from "@/components/common/loading";
-import { CategoryDetailPage } from '@/app/(admin)/admin/dashboard/categories/[categoryId]/_components/category-detail-page';
+import { CategoryDetailPage } from './_components/category-detail-page';
 
 
 export default async function CategoryDetailPageWrapper(

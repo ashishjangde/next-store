@@ -139,7 +139,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
       }
       queryClient.invalidateQueries({ queryKey: ["vendor-products"] });
       if (!productId && response?.data?.id) {
-        router.push(`/vendor/dashboard/products/new?update=${response.data.id}`);
+        router.push(`/vendor/products/new?update=${response.data.id}`);
       }
       router.refresh();
     },
@@ -153,7 +153,7 @@ export const ProductForm = ({ initialData }: ProductFormProps) => {
     mutationFn: (id: string) => ProductActions.deleteProduct(id),
     onSuccess: () => {
       toast.success("Product deleted successfully");
-      router.push("/vendor/dashboard/products");
+      router.push("/vendor/products");
     },
     onError: (error) => {
       console.error("Error deleting product:", error);

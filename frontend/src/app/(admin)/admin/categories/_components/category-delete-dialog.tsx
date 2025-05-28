@@ -49,7 +49,7 @@ export function CategoryDeleteDialog({ children, category, redirectAfterDelete =
       
       if (redirectAfterDelete) {
         setTimeout(() => {
-          router.push('/admin/dashboard/categories')
+          router.push('/admin/categories')
         }, 100)
       }
     },

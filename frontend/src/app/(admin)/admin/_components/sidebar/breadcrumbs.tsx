@@ -49,7 +49,7 @@ export function Breadcrumbs() {
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
             <Link 
-              href="/vendor/dashboard" 
+              href="/admin/dashboard" 
               className={cn(
                 "flex h-7 items-center justify-center rounded-md px-2",
                 "text-sm font-medium transition-colors",

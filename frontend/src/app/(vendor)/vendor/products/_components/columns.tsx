@@ -77,7 +77,7 @@ export const ProductColumns: ColumnDef<Product>[] = [
     cell: ({ row }) => {
       return (
         <div className="flex flex-col">
-          <Link href={`/vendor/dashboard/products/${row.original.id}`} className="font-medium hover:underline">
+          <Link href={`/vendor/products/${row.original.id}`} className="font-medium hover:underline">
             {row.original.title}
           </Link>
           {row.original.sku && (

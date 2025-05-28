@@ -42,7 +42,7 @@ export const ProductVariantsPage = ({ productId }: ProductVariantsPageProps) => 
   useEffect(() => {
     if (error) {
       toast.error("Failed to load product");
-      router.push("/vendor/dashboard/products");
+      router.push("/vendor/products");
     }
   }, [error, router]);
 
@@ -54,13 +54,13 @@ export const ProductVariantsPage = ({ productId }: ProductVariantsPageProps) => 
 
   if (!product) {
     toast.error("Product not found");
-    router.push("/vendor/dashboard/products");
+    router.push("/vendor/products");
     return null;
   }
 
   if (product.product_type !== "PARENT") {
     toast.error("Variants can only be created for parent products");
-    router.push("/vendor/dashboard/products");
+    router.push("/vendor/products");
     return null;
   }
 

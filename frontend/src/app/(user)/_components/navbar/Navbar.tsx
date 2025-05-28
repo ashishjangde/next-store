@@ -81,8 +81,10 @@ const ProfileDropdown = memo(() => {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+          <Link href="/profile" className="flex items-center gap-2 w-full">
           <User className="w-4 h-4" />
           <span>Profile</span>
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
           <Settings className="w-4 h-4" />

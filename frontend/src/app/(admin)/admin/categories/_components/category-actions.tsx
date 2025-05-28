@@ -36,7 +36,7 @@ export function CategoryActions({ category }: CategoryActionsProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <Link href={`/admin/dashboard/categories/${category.id}`} passHref>
+      <Link href={`/admin/categories/${category.id}`} passHref>
         <Button variant="outline" size="sm">
           <Eye className="h-4 w-4" />
           <span className="sr-only">View</span>

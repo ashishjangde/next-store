@@ -50,7 +50,7 @@ export const ProductInventoryPage = ({ productId }: ProductInventoryPageProps) =
   useEffect(() => {
     if (productError || inventoryError) {
       toast.error("Failed to load product or inventory data");
-      router.push("/vendor/dashboard/products");
+      router.push("/vendor/products");
     }
   }, [productError, inventoryError, router]);
 
@@ -64,7 +64,7 @@ export const ProductInventoryPage = ({ productId }: ProductInventoryPageProps) =
 
   if (!product) {
     toast.error("Product not found");
-    router.push("/vendor/dashboard/products");
+    router.push("/vendor/products");
     return null;
   }
 

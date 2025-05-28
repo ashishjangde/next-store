@@ -39,12 +39,10 @@ const data = {
     email: "m@example.com",
     avatar: "/avatars/shadcn.jpg",
   },
-  navMain: [
-    {
+  navMain: [    {
       title: "Dashboard",
       url: "dashboard",
       icon: LayoutDashboard,
-      isActive: true,
       items: [
         {
           title: "Overview",
@@ -62,99 +60,99 @@ const data = {
     },
     {
       title: "Categories",
-      url: "/admin/dashboard/categories",
+      url: "categories",
       icon: Tag,
       items: [
         {
           title: "All Categories",
-          url: "/admin/dashboard/categories",
+          url: "/admin/categories",
         }
       ],
     },
     {
       title: "Attributes",
-      url: "/admin/dashboard/attributes",
+      url: "attributes",
       icon: ClipboardList,
       items: [
         {
           title: "All Attributes",
-          url: "/admin/dashboard/attributes",
+          url: "/admin/attributes",
         },
         {
           title: "Add Attribute",
-          url: "/admin/dashboard/attributes/new",
+          url: "/admin/attributes/new",
         },
       ],
     },
     {
       title: "Vendors",
-      url: "/admin/dashboard/vendors",
+      url: "vendors",
       icon: Store,
       items: [
         {
           title: "All Vendors",
-          url: "/admin/dashboard/vendors",
+          url: "/admin/vendors",
         },
         {
           title: "Vendor Payouts",
-          url: "/admin/dashboard/vendors/payouts",
+          url: "/admin/vendors/payouts",
         },
       ],
     },
     {
       title: "Users",
-      url: "/admin/dashboard/users",
+      url: "users",
       icon: Home,
       items: [
         {
           title: "All Users",
-          url: "/admin/dashboard/users",
+          url: "/admin/users",
         },
         {
           title: "Add User",
-          url: "/admin/dashboard/users/new",
+          url: "/admin/users/new",
         },
         {
           title: "User Roles",
-          url: "/admin/dashboard/users/roles",
+          url: "/admin/users/roles",
         },
       ],
     },
     {
       title: "Marketing",
-      url: "/admin/dashboard/marketing",
+      url: "marketing",
       icon: BarChart3,
       items: [
         {
           title: "Promotions",
-          url: "/admin/dashboard/marketing/promotions",
+          url: "/admin/marketing/promotions",
         },
         {
           title: "Coupons",
-          url: "/admin/dashboard/marketing/coupons",
+          url: "/admin/marketing/coupons",
         },
         {
           title: "Banners",
-          url: "/admin/dashboard/marketing/banners",
+          url: "/admin/marketing/banners",
         },
       ],
     },
     {
       title: "Content",
-      url: "/admin/dashboard/content",
+      url: "content",
       icon: BookOpen,
       items: [
         {
           title: "Pages",
-          url: "/admin/dashboard/content/pages",
+          url: "/admin/content/pages",
         },
         {
           title: "Blog Posts",
-          url: "/admin/dashboard/content/blog",
+          url: "/admin/content/blog",
         },
         {
           title: "FAQs",
-          url: "/admin/dashboard/content/faqs",
+          url: "/admin/content/faqs",
         },
       ],
     },

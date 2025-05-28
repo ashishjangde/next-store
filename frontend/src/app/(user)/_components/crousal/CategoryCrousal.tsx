@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
-import {  Pagination, Navigation } from 'swiper/modules';
+import { Pagination, Navigation } from 'swiper/modules';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { UiActions, Category } from '@/api-actions/ui-actions';
@@ -9,7 +9,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 interface CategoryCarouselProps {
-    categories?: Category[]; // Allow passing categories as props
+    categories?: Category[];
 }
 
 export default function CategoryCarousel({ categories: propCategories }: CategoryCarouselProps = {}) {
@@ -21,7 +21,6 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
 
     React.useEffect(() => {
         const fetchCategories = async () => {
-            // If categories are provided as props, use them directly
             if (propCategories && propCategories.length > 0) {
                 setCategories(propCategories);
                 setIsLoading(false);
@@ -52,7 +51,9 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
             icon: category.image || '/categories/default.svg',
             productCount: category._count?.Products || 0
         }));
-    }, [categories]);    if (isLoading) {
+    }, [categories]);
+
+    if (isLoading) {
         return (
             <div className="w-full flex justify-center items-center py-12">
                 <div className="animate-pulse flex space-x-4">
@@ -78,12 +79,10 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
             </div>
         );
     }
-    
-
 
     return (
         <div className="w-full flex justify-center items-center">
-            <div className="w-full max-w-[1500px]">
+            <div className="w-full max-w-[1500px] relative">
                 <Swiper
                     style={{
                         ['--swiper-navigation-color' as string]: '#2563eb',
@@ -96,7 +95,7 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                     navigation={{
                         prevEl: '.swiper-button-prev-custom',
                         nextEl: '.swiper-button-next-custom',
-                      }}
+                    }}
                     breakpoints={{
                         320: { slidesPerView: 3 },
                         640: { slidesPerView: 4 },
@@ -104,28 +103,33 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                         1024: { slidesPerView: 7 }
                     }}
                     modules={[Pagination, Navigation]}
+                    onSwiper={(swiper) => {
+                        const total = swiper.slides.length - (swiper.params.slidesPerView as number);
+                        setTotalSlides(total > 0 ? total : 0);
+                    }}
                     onSlideChange={(swiper) => setActiveIndex(swiper.activeIndex)}
-                >                    {slides.map((slide, index) => (
-                        <SwiperSlide 
-                            key={slide.id} 
-                            className="group h-32 relative"
-                        >
-                            <Link href={`/categories/${slide.slug}`} className="w-full h-full flex flex-col items-center">                                <div
+                >
+                    {slides.map((slide) => (
+                        <SwiperSlide key={slide.id} className="group h-32 relative">
+                            <Link href={`/categories/${slide.slug}`} className="w-full h-full flex flex-col items-center">
+                                <div
                                     className={cn(
-                                        "rounded-full shadow-lg w-20 h-20", 
+                                        "rounded-full shadow-lg w-20 h-20",
                                         "flex items-center justify-center",
                                         "transition-all duration-500 ease-in-out",
                                         "transform hover:scale-110",
                                         "hover:shadow-xl cursor-pointer",
-                                        "overflow-hidden relative",                                        "border-2 border-gray-100",
-                                        "bg-gray-200",
+                                        "overflow-hidden relative",
+                                        "border-2 border-gray-100 bg-gray-200"
                                     )}
                                     style={{
                                         borderRadius: '50%',
                                         clipPath: 'circle(50% at 50% 50%)'
-                                    }}                                >{slide.image && !imageErrors.has(slide.id) ? (
-                                        <Image 
-                                            src={slide.image} 
+                                    }}
+                                >
+                                    {slide.image && !imageErrors.has(slide.id) ? (
+                                        <Image
+                                            src={slide.image}
                                             alt={slide.name}
                                             width={80}
                                             height={80}
@@ -137,23 +141,21 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                                                 maxHeight: '100%'
                                             }}
                                             onError={() => {
-                                                // Add this image to error set so it shows fallback
                                                 setImageErrors(prev => new Set(prev).add(slide.id));
                                             }}
-                                            unoptimized={slide.image?.endsWith('.svg')} // Don't optimize SVGs
+                                            unoptimized={slide.image?.endsWith('.svg')}
                                         />
                                     ) : (
                                         <Package className="w-10 h-10 text-white" />
                                     )}
                                 </div>
-                                <div className="w-full absolute top-20"> 
-                                    <span 
+                                <div className="w-full absolute top-20">
+                                    <span
                                         className={cn(
-                                            "font-medium text-gray-700 text-base", 
+                                            "font-medium text-gray-700 text-base",
                                             "transition-all duration-500",
                                             "group-hover:text-blue-600",
-                                            "whitespace-nowrap",
-                                            "block text-center"
+                                            "whitespace-nowrap block text-center"
                                         )}
                                     >
                                         {slide.name}
@@ -167,43 +169,49 @@ export default function CategoryCarousel({ categories: propCategories }: Categor
                             </Link>
                         </SwiperSlide>
                     ))}
+
+                    {/* Left Arrow */}
                     <div className="absolute top-0 left-0 h-full z-10 swiper-button-prev-custom">
                         <button
                             className={cn(
                                 "h-full px-4 flex items-center transition-colors duration-200",
-                                "disabled:opacity-40 disabled:cursor-not-allowed ",
                                 activeIndex === 0 && "opacity-40 cursor-not-allowed"
                             )}
                             onClick={(e) => {
                                 if (activeIndex === 0) e.preventDefault();
                             }}
                         >
-                            <ChevronLeft 
-                                size={40} 
+                            <ChevronLeft
+                                size={40}
                                 className={cn(
                                     "dark:text-primary-foreground text-gray-700 transition-colors duration-200",
-                                    activeIndex === 0 ? "text-gray-700" : "dark:hover:text-primary-foreground hover:text-gray-600"
-                                )} 
+                                    activeIndex === 0
+                                        ? "text-gray-700"
+                                        : "dark:hover:text-primary-foreground hover:text-gray-600"
+                                )}
                             />
                         </button>
                     </div>
+
+                    {/* Right Arrow */}
                     <div className="absolute top-0 right-0 h-full z-10 swiper-button-next-custom">
                         <button
                             className={cn(
                                 "h-full px-4 flex items-center transition-colors duration-200",
-                                "disabled:opacity-40 disabled:cursor-not-allowed",
                                 activeIndex >= totalSlides && "opacity-40 cursor-not-allowed"
                             )}
                             onClick={(e) => {
                                 if (activeIndex >= totalSlides) e.preventDefault();
                             }}
                         >
-                            <ChevronRight 
-                                size={40} 
+                            <ChevronRight
+                                size={40}
                                 className={cn(
-                                    "dark:text-primary-foreground  text-gray-700 transition-colors duration-200",
-                                    activeIndex >= totalSlides ? "text-gray-700" : "dark:hover:text-primary-foreground hover:text-gray-600"
-                                )} 
+                                    "dark:text-primary-foreground text-gray-700 transition-colors duration-200",
+                                    activeIndex >= totalSlides
+                                        ? "text-gray-700"
+                                        : "dark:hover:text-primary-foreground hover:text-gray-600"
+                                )}
                             />
                         </button>
                     </div>

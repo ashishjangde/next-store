@@ -67,7 +67,7 @@ export const ProductDetailPage = ({ productId }: ProductDetailPageProps) => {
   useEffect(() => {
     if (error) {
       toast.error("Failed to load product");
-      router.push("/vendor/dashboard/products");
+      router.push("/vendor/products");
     }
   }, [error, router]);
 
@@ -80,7 +80,7 @@ export const ProductDetailPage = ({ productId }: ProductDetailPageProps) => {
 
   if (!product) {
     toast.error("Product not found");
-    router.push("/vendor/dashboard/products");
+    router.push("/vendor/products");
     return null;
   }
 
@@ -131,14 +131,14 @@ export const ProductDetailPage = ({ productId }: ProductDetailPageProps) => {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => router.push(`/vendor/dashboard/products/new?update=${productId}`)}
+              onClick={() => router.push(`/vendor/products/new?update=${productId}`)}
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit Product
             </Button>
             {product.product_type === "PARENT" && (
               <Button
-                onClick={() => router.push(`/vendor/dashboard/products/new?parent_id=${productId}`)}
+                onClick={() => router.push(`/vendor/products/new?parent_id=${productId}`)}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Variant

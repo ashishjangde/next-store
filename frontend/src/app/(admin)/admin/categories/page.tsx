@@ -1,5 +1,6 @@
 import { Metadata } from "next";
-import { CategoriesClient } from "@/app/(admin)/admin/dashboard/categories/[categoryId]/_components/categories-client";
+import { CategoriesClient } from "./[categoryId]/_components/categories-client";
+
 
 export const metadata: Metadata = {
   title: "Categories Management | Admin Dashboard",
