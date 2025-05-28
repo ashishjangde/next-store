@@ -1,6 +1,6 @@
 'use client'
 import { ScrollArea } from "@/components/ui/scroll-area";
-import SideBarIndex from "./vendor/dashboard/_components/sidebar";
+import SideBarIndex from "./vendor/_components/sidebar";
 import { withAuth } from "@/components/custom/withAuth";
 
 function VendorLayout({

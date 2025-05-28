@@ -33,11 +33,6 @@ import Link from "next/link"
 
 // This is sample data.
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
     {
       title: "Dashboard",
@@ -62,91 +57,91 @@ const data = {
       items: [
         {
           title: "View Products",
-          url: "/vendor/dashboard/products",
+          url: "/vendor/products",
         },
         {
           title: "Add New Product",
-          url: "/vendor/dashboard/products/new",
+          url: "/vendor/products/new",
         }
       ],
     },
     {
       title: "Orders Management",
-      url: "/vendor/dashboard/orders",
+      url: "/vendor/orders",
       icon: ShoppingCart,
       items: [
         {
           title: "New Orders",
-          url: "/vendor/dashboard/orders/new",
+          url: "/vendor/orders/new",
         },
         {
           title: "Shipped Orders",
-          url: "/vendor/dashboard/orders/shipped",
+          url: "/vendor/orders/shipped",
         },
         {
           title: "Completed Orders",
-          url: "/vendor/dashboard/orders/completed",
+          url: "/vendor/orders/completed",
         },
         {
           title: "Cancelled/Returned",
-          url: "/vendor/dashboard/orders/cancelled",
+          url: "/vendor/orders/cancelled",
         },
         {
           title: "Shipping Labels",
-          url: "/vendor/dashboard/orders/shipping-labels",
+          url: "/vendor/orders/shipping-labels",
         },
       ],
     },
     {
       title: "Payments & Settlements",
-      url: "/vendor/dashboard/payments",
+      url: "/vendor/payments",
       icon: CreditCard,
       items: [
         {
           title: "View Earnings",
-          url: "/vendor/dashboard/payments/earnings",
+          url: "/vendor/payments/earnings",
         },
         {
           title: "Payment Cycle",
-          url: "/vendor/dashboard/payments/cycle",
+          url: "/vendor/payments/cycle",
         },
         {
           title: "Download Reports",
-          url: "/vendor/dashboard/payments/reports",
+          url: "/vendor/payments/reports",
         },
       ],
     },
     {
       title: "Returns & Claims",
-      url: "/vendor/dashboard/returns",
+      url: "/vendor/returns",
       icon: RefreshCcw,
       items: [
         {
           title: "View Returns",
-          url: "/vendor/dashboard/returns/list",
+          url: "/vendor/returns/list",
         },
         {
           title: "Manage Disputes",
-          url: "/vendor/dashboard/returns/disputes",
+          url: "/vendor/returns/disputes",
         },
       ],
     },
     {
       title: "Settings",
-      url: "/vendor/dashboard/settings",
+      url: "/vendor/settings",
       icon: Settings2,
       items: [
         {
           title: "Profile Settings",
-          url: "/vendor/dashboard/settings/profile",
+          url: "/vendor/settings/profile",
         },
         {
           title: "Store Settings",
-          url: "/vendor/dashboard/settings/store",
+          url: "/vendor/settings/store",
         },
         {
           title: "Payment Settings",
-          url: "/vendor/dashboard/settings/payment",
+          url: "/vendor/settings/payment",
         },
       ],
     },
@@ -185,7 +180,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={data.navMain} />
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border/50 pt-2">
-        {/* <NavUser /> */}
       </SidebarFooter>
       <SidebarRail className="bg-sidebar-accent/10" />
     </Sidebar>

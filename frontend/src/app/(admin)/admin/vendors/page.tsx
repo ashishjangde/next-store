@@ -1,5 +1,5 @@
 
-import { VendorDashboard } from "@/app/(admin)/admin/dashboard/vendors/_components/vendor-dashboard"
+import { VendorDashboard } from "@/app/(admin)/admin/vendors/_components/vendor-dashboard"
 
 export default function VendorsPage() {
   return (
