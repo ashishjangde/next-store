@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -9,17 +9,25 @@ import { Product } from '@/types/product';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useCartStore } from '@/store/cart-store';
+import { useWishlistStore } from '@/store/wishlist-store';
+import { useAuthStore } from '@/store/auth-store';
 
 interface ProductCardProps {
-  product: Product;
+  product: Product | {
+    id: string;
+    title: string;
+    price: number;
+    discount_price?: number;
+    images?: string[];
+    slug: string;
+    category?: { name: string };
+    inventory?: { quantity: number };
+    Product?: Product;
+  };
   showAddToCart?: boolean;
   showWishlist?: boolean;
   className?: string;
-  isAuthenticated?: boolean;
-  isInWishlist?: boolean;
-  onAddToCart?: (productId: string, quantity: number) => Promise<void>;
-  onAddToWishlist?: (productId: string) => Promise<void>;
-  onRemoveFromWishlist?: (productId: string) => Promise<void>;
 }
 
 export function ProductCard({ 
@@ -27,27 +35,46 @@ export function ProductCard({
   showAddToCart = true, 
   showWishlist = true,
   className = '',
-  isAuthenticated = false,
-  isInWishlist = false,
-  onAddToCart,
-  onAddToWishlist,
-  onRemoveFromWishlist
 }: ProductCardProps) {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isInWishlist, setIsInWishlist] = useState(false);
   
-  const hasDiscount = product.discount_price && product.discount_price < product.price;
-  const discountPercentage = hasDiscount 
-    ? Math.round(((product.price - product.discount_price!) / product.price) * 100)
+  const { isAuthenticated } = useAuthStore();
+  const { addToCart } = useCartStore();
+  const { addToWishlist, removeFromWishlist, checkInWishlist } = useWishlistStore();
+  
+  // Handle both direct product and nested product from wishlist
+  if (!product) {
+    return null; // Don't render if product is undefined
+  }
+  
+  const actualProduct = 'Product' in product ? product.Product : product;
+  
+  if (!actualProduct) {
+    return null; // Don't render if product data is missing
+  }
+  
+  const hasDiscount = actualProduct.discount_price !== undefined && actualProduct.discount_price < actualProduct.price;
+  const discountPercentage = hasDiscount && actualProduct.discount_price !== undefined
+    ? Math.round(((actualProduct.price - actualProduct.discount_price) / actualProduct.price) * 100)
     : 0;
-  const finalPrice = product.discount_price || product.price || 0;
-  const originalPrice = product.price || 0;
+  const finalPrice = actualProduct.discount_price ?? actualProduct.price ?? 0;
+  const originalPrice = actualProduct.price ?? 0;
   
   // Handle both inventory and Inventory (backend inconsistency fallback)
-  const inventory = product.inventory || (product as any).Inventory;
+  const inventory = actualProduct.inventory || (actualProduct as any).Inventory;
   const isOutOfStock = (inventory?.quantity ?? 0) === 0;
+
+  useEffect(() => {
+    const checkWishlistStatus = async () => {
+      const inWishlist = await checkInWishlist(actualProduct.id);
+      setIsInWishlist(inWishlist);
+    };
+    checkWishlistStatus();
+  }, [actualProduct.id, checkInWishlist]);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -65,10 +92,8 @@ export function ProductCard({
 
     setIsAddingToCart(true);
     try {
-      if (onAddToCart) {
-        await onAddToCart(product.id, 1);
-        toast.success('Added to cart successfully!');
-      }
+      await addToCart({ productId: actualProduct.id, quantity: 1 });
+      toast.success('Added to cart successfully!');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add to cart');
     } finally {
@@ -87,11 +112,13 @@ export function ProductCard({
 
     setIsAddingToWishlist(true);
     try {
-      if (isInWishlist && onRemoveFromWishlist) {
-        await onRemoveFromWishlist(product.id);
+      if (isInWishlist) {
+        await removeFromWishlist({ wishlist_item_id: actualProduct.id });
+        setIsInWishlist(false);
         toast.success('Removed from wishlist');
-      } else if (onAddToWishlist) {
-        await onAddToWishlist(product.id);
+      } else {
+        await addToWishlist({ productId: actualProduct.id });
+        setIsInWishlist(true);
         toast.success('Added to wishlist');
       }
     } catch (error) {
@@ -100,10 +127,13 @@ export function ProductCard({
       setIsAddingToWishlist(false);
     }
   };
+
   const handleImageError = () => {
     setImageError(true);
-  };  return (
-    <Link href={`/products/${product.slug}`} className={`block ${className}`}>
+  };
+
+  return (
+    <Link href={`/products/${actualProduct.slug}`} className={`block ${className}`}>
       <div 
         className="group relative overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md"
         onMouseEnter={() => setIsHovered(true)}
@@ -111,10 +141,10 @@ export function ProductCard({
       >
         {/* Product Image - Covers full top */}
         <div className="relative h-60 w-full overflow-hidden rounded-t-lg">
-          {product.images && product.images.length > 0 && !imageError ? (
+          {actualProduct.images && actualProduct.images.length > 0 && !imageError ? (
             <Image
-              src={product.images[0]}
-              alt={product.title}
+              src={actualProduct.images[0]}
+              alt={actualProduct.title}
               fill
               className="object-cover transition-transform duration-700 group-hover:scale-105"
               onError={handleImageError}
@@ -162,15 +192,17 @@ export function ProductCard({
         {/* Content */}
         <div className="space-y-3 p-6">
           <div className="space-y-1">
-            <h3 className="line-clamp-2 text-base font-medium leading-snug tracking-tight">
-              {product.title}
+            <h3 className="line-clamp-2 text-base font-medium leading-snug tracking-tight text-clip">
+              {actualProduct.title}
             </h3>
-            {product.category && (
+            {actualProduct.category && (
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                {product.category.name}
+                {actualProduct.category.name}
               </p>
             )}
-          </div>          {/* Price Section - Animated */}
+          </div>
+
+          {/* Price Section - Animated */}
           <motion.div
             className="relative overflow-hidden"
             animate={{
@@ -209,7 +241,8 @@ export function ProductCard({
                 className="w-full"
               >
                 {isAddingToCart ? 'Adding...' : 'Add to Cart'}
-              </Button>            </motion.div>
+              </Button>
+            </motion.div>
           )}
         </div>
       </div>

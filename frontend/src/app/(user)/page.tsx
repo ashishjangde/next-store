@@ -100,7 +100,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-6 gap-6">
                 {homeData.trendingProducts.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -144,7 +144,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-6 sm:grid-cols-2 lg:grid-cols-6 gap-6">
                 {homeData.newProducts.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -168,13 +168,6 @@ export default function Home() {
           </section>
         )}
 
-          {/* Featured Products by Category */}
-          {homeData?.featuredProducts && homeData.featuredProducts.length > 0 && (
-            <FeaturedCategorySection 
-              categories={homeData.featuredProducts} 
-              className="mb-16"
-            />
-          )}        {/* Personalized Suggestions Section (if user is logged in) */}
         {homeData?.suggestions && homeData.suggestions.length > 0 && (
           <section className="py-16 bg-gray-50">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">

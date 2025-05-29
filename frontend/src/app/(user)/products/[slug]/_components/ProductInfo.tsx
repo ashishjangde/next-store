@@ -1,16 +1,32 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Package } from 'lucide-react';
+import { Package, Heart } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Product } from '@/types/product';
 import { formatPrice } from '../../../../../utils/format';
-import ProductActions from './ProductActions';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { useCartStore } from '@/store/cart-store';
+import { useWishlistStore } from '@/store/wishlist-store';
+import { useAuthStore } from '@/store/auth-store';
+import { cn } from '@/lib/utils';
 
 interface ProductInfoProps {
   product: Product;
 }
 
 export default function ProductInfo({ product }: ProductInfoProps) {
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  const { isAuthenticated } = useAuthStore();
+  const { addToCart } = useCartStore();
+  const { addToWishlist, removeFromWishlist, checkInWishlist } = useWishlistStore();
+
   const {
     title,
     description,
@@ -27,6 +43,60 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
   const isInStock = inventory && inventory.quantity > 0;
   const isLowStock = inventory && inventory.quantity <= inventory.low_stock_threshold;
+
+  useEffect(() => {
+    const checkWishlistStatus = async () => {
+      const inWishlist = await checkInWishlist(product.id);
+      setIsInWishlist(inWishlist);
+    };
+    checkWishlistStatus();
+  }, [product.id, checkInWishlist]);
+
+  const handleAddToCart = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to add items to cart');
+      return;
+    }
+
+    if (!isInStock) {
+      toast.error('Product is out of stock');
+      return;
+    }
+
+    setIsAddingToCart(true);
+    try {
+      await addToCart({ productId: product.id, quantity });
+      toast.success('Added to cart successfully!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to add to cart');
+    } finally {
+      setIsAddingToCart(false);
+    }
+  };
+
+  const handleWishlistToggle = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to manage wishlist');
+      return;
+    }
+
+    setIsAddingToWishlist(true);
+    try {
+      if (isInWishlist) {
+        await removeFromWishlist({ wishlist_item_id: product.id });
+        setIsInWishlist(false);
+        toast.success('Removed from wishlist');
+      } else {
+        await addToWishlist({ productId: product.id });
+        setIsInWishlist(true);
+        toast.success('Added to wishlist');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update wishlist');
+    } finally {
+      setIsAddingToWishlist(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -76,8 +146,53 @@ export default function ProductInfo({ product }: ProductInfoProps) {
             {inventory.quantity} items available
           </p>
         )}
-      </div>      {/* Action Buttons */}
-      <ProductActions product={product} />
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setQuantity(prev => Math.max(1, prev - 1))}
+            disabled={quantity <= 1}
+          >
+            -
+          </Button>
+          <span className="w-8 text-center">{quantity}</span>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setQuantity(prev => prev + 1)}
+            disabled={!isInStock || quantity >= (inventory?.quantity || 0)}
+          >
+            +
+          </Button>
+        </div>
+
+        <Button
+          className="flex-1"
+          onClick={handleAddToCart}
+          disabled={isAddingToCart || !isInStock}
+        >
+          {isAddingToCart ? 'Adding...' : 'Add to Cart'}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleWishlistToggle}
+          disabled={isAddingToWishlist}
+          className="h-10 w-10"
+        >
+          <Heart
+            className={cn(
+              "h-5 w-5 transition-colors",
+              isInWishlist ? "fill-red-500 text-red-500" : "text-muted-foreground hover:text-red-500",
+            )}
+          />
+        </Button>
+      </div>
 
       <Separator />
 

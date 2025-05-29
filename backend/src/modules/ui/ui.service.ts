@@ -39,6 +39,11 @@ export class UiService {
       newProducts
     };
   }
+
+
+
+
+  
   async getActiveBanners() {
     return this.bannerRepository.findActiveForPublic();
   }  async getCategoriesWithFeaturedProducts() {

@@ -12,18 +12,19 @@ import { Separator } from '@/components/ui/separator';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 
 interface ProductPageProps {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 }
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const { slug } = await params;
   try {
     const cookieStore = cookies();
     const cookieString = cookieStore.toString();
       const response = await ProductActions.getProductBySlug(
-      params.slug,
+      slug,
       {
         include_category: true,
         include_attributes: true,
@@ -81,11 +82,12 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
+  const { slug } = await params;  
   try {
     const cookieStore = cookies();
     const cookieString = cookieStore.toString();    // Fetch product with all related data
     const response = await ProductActions.getProductBySlug(
-      params.slug,
+      slug,
       {
         include_category: true,
         include_attributes: true,
@@ -119,37 +121,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
     return (
       <div className="min-h-screen bg-white">
-        {/* Breadcrumb */}
-        <div className="border-b">
-          <div className="container mx-auto px-4 py-4">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/">Home</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/products">Products</BreadcrumbLink>
-                </BreadcrumbItem>
-                {product.category && (
-                  <>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbLink href={`/products?category_id=${product.category.id}`}>
-                        {product.category.name}
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                  </>
-                )}
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{product.title}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </div>
-
         {/* Main Product Section */}
         <div className="container mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
