@@ -15,7 +15,7 @@ import {
   DropdownMenuPortal
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { SearchBar } from './SearchBar'
 import {
@@ -160,6 +160,8 @@ const MobileMenu = () => {
           <Menu className="h-6 w-6" />
         </Button>
       </SheetTrigger>
+      <SheetTitle hidden={true}>
+      </SheetTitle>
       <SheetContent side="left" className="w-[300px] sm:w-[400px]">
         <div className="flex flex-col gap-4 py-4">
           <Link href="/" className="flex items-center px-4 py-2 hover:bg-accent rounded-lg">
