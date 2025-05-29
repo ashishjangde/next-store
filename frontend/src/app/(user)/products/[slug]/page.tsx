@@ -12,18 +12,18 @@ import { Separator } from '@/components/ui/separator';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 
 interface ProductPageProps {
-  params: Promise<{
+  params: {
     slug: string;
-  }>;
+  };
 }
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
   try {
-    const { slug } = await params;
     const cookieStore = cookies();
     const cookieString = cookieStore.toString();
-      const response = await ProductActions.getProductBySlug(slug,
+      const response = await ProductActions.getProductBySlug(
+      params.slug,
       {
         include_category: true,
         include_attributes: true,
@@ -81,11 +81,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
-  const { slug } = await params;
   try {
     const cookieStore = cookies();
     const cookieString = cookieStore.toString();    // Fetch product with all related data
-    const response = await ProductActions.getProductBySlug(slug,
+    const response = await ProductActions.getProductBySlug(
+      params.slug,
       {
         include_category: true,
         include_attributes: true,

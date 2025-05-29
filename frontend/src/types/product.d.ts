@@ -38,6 +38,12 @@ export interface Product {
     low_stock_threshold: number;
     reserved_quantity: number;
   };
+  // Fallback for backend inconsistency
+  Inventory?: {
+    quantity: number;
+    low_stock_threshold: number;
+    reserved_quantity: number;
+  };
 }
 
 /**
