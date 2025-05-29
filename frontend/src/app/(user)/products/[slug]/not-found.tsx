@@ -6,27 +6,27 @@ import { AlertCircle, ArrowLeft, Home, Search } from 'lucide-react';
 
 export default function ProductNotFound() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <Card className="max-w-lg w-full">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-red-600" />
+          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-destructive" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">
+          <CardTitle className="text-2xl font-bold text-foreground dark:text-white">
             Product Not Found
           </CardTitle>
         </CardHeader>
         
         <CardContent className="space-y-6 text-center">
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             The product you're looking for doesn't exist or may have been removed.
           </p>
           
           <div className="space-y-4">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               This could happen if:
             </div>
-            <ul className="text-sm text-gray-600 space-y-1 text-left">
+            <ul className="text-sm text-muted-foreground space-y-1 text-left">
               <li>• The product URL is incorrect</li>
               <li>• The product has been discontinued</li>
               <li>• The product is temporarily unavailable</li>

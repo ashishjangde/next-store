@@ -83,7 +83,7 @@ export default function ProductInfo({ product }: ProductInfoProps) {
     setIsAddingToWishlist(true);
     try {
       if (isInWishlist) {
-        await removeFromWishlist({ wishlist_item_id: product.id });
+        await removeFromWishlist({ productId: product.id });
         setIsInWishlist(false);
         toast.success('Removed from wishlist');
       } else {
@@ -103,7 +103,7 @@ export default function ProductInfo({ product }: ProductInfoProps) {
       {/* Product Title and Badge */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{title}</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-foreground dark:text-white">{title}</h1>
           {product_type === 'VARIANT' && (
             <Badge variant="secondary">Variant</Badge>
           )}
@@ -113,14 +113,14 @@ export default function ProductInfo({ product }: ProductInfoProps) {
         </div>
         
         {brand && (
-          <p className="text-lg text-gray-600">by {brand}</p>
+          <p className="text-lg text-muted-foreground">by {brand}</p>
         )}
       </div>
 
       {/* Price */}
       <div className="space-y-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-gray-900">
+          <span className="text-3xl font-bold text-foreground dark:text-white">
             {formatPrice(price)}
           </span>
         </div>
@@ -132,17 +132,17 @@ export default function ProductInfo({ product }: ProductInfoProps) {
           <Package className="h-4 w-4" />
           <span className="text-sm font-medium">
             {isInStock ? (
-              <span className={isLowStock ? 'text-orange-600' : 'text-green-600'}>
+              <span className={isLowStock ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}>
                 {isLowStock ? 'Low Stock' : 'In Stock'}
               </span>
             ) : (
-              <span className="text-red-600">Out of Stock</span>
+              <span className="text-red-600 dark:text-red-400">Out of Stock</span>
             )}
           </span>
         </div>
         
         {inventory && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             {inventory.quantity} items available
           </p>
         )}
@@ -159,7 +159,7 @@ export default function ProductInfo({ product }: ProductInfoProps) {
           >
             -
           </Button>
-          <span className="w-8 text-center">{quantity}</span>
+          <span className="w-8 text-center text-foreground dark:text-white">{quantity}</span>
           <Button
             variant="outline"
             size="icon"
@@ -198,33 +198,33 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
       {/* Product Details */}
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Product Details</h3>
+        <h3 className="text-lg font-semibold text-foreground dark:text-white">Product Details</h3>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           {category && (
             <div>
-              <span className="font-medium text-gray-700">Category:</span>
-              <span className="ml-2 text-gray-600">{category.name}</span>
+              <span className="font-medium text-muted-foreground">Category:</span>
+              <span className="ml-2 text-foreground dark:text-white">{category.name}</span>
             </div>
           )}
           
           {season && (
             <div>
-              <span className="font-medium text-gray-700">Season:</span>
-              <span className="ml-2 text-gray-600">{season}</span>
+              <span className="font-medium text-muted-foreground">Season:</span>
+              <span className="ml-2 text-foreground dark:text-white">{season}</span>
             </div>
           )}
           
           {weight && (
             <div>
-              <span className="font-medium text-gray-700">Weight:</span>
-              <span className="ml-2 text-gray-600">{weight}g</span>
+              <span className="font-medium text-muted-foreground">Weight:</span>
+              <span className="ml-2 text-foreground dark:text-white">{weight}g</span>
             </div>
           )}
           
           <div>
-            <span className="font-medium text-gray-700">Type:</span>
-            <span className="ml-2 text-gray-600">
+            <span className="font-medium text-muted-foreground">Type:</span>
+            <span className="ml-2 text-foreground dark:text-white">
               {product_type === 'PARENT' ? 'Main Product' : 'Variant'}
             </span>
           </div>
@@ -236,12 +236,12 @@ export default function ProductInfo({ product }: ProductInfoProps) {
         <>
           <Separator />
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Specifications</h3>
+            <h3 className="text-lg font-semibold text-foreground dark:text-white">Specifications</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {attributes.map((attr) => (
                 <div key={attr.id} className="flex justify-between">
-                  <span className="font-medium text-gray-700">{attr.name}:</span>
-                  <span className="text-gray-600">{attr.display_value || attr.value}</span>
+                  <span className="font-medium text-muted-foreground">{attr.name}:</span>
+                  <span className="text-foreground dark:text-white">{attr.display_value || attr.value}</span>
                 </div>
               ))}
             </div>
@@ -252,8 +252,8 @@ export default function ProductInfo({ product }: ProductInfoProps) {
       {/* Description */}
       <Separator />
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Description</h3>
-        <p className="text-gray-600 leading-relaxed">{description}</p>
+        <h3 className="text-lg font-semibold text-foreground dark:text-white">Description</h3>
+        <p className="text-muted-foreground leading-relaxed">{description}</p>
       </div>
     </div>
   );

@@ -31,13 +31,13 @@ export default function Home() {
       <div className="flex flex-col min-h-screen">
         {/* Hero Section with Loading */}
         <div className="w-screen">
-          <div className="h-64 md:h-96 bg-gray-200 animate-pulse"></div>
-          <div className="flex flex-col items-center justify-center py-12 bg-white">
+          <div className="h-64 md:h-96 bg-muted/50 dark:bg-gray-100/5 animate-pulse"></div>
+          <div className="flex flex-col items-center justify-center py-12 bg-background">
             <div className="animate-pulse flex justify-between w-full px-4 max-w-7xl mx-auto">
               {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex flex-col items-center">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gray-300 rounded-full mb-2"></div>
-                  <div className="w-12 h-3 md:w-16 md:h-4 bg-gray-300 rounded"></div>
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-muted/50 dark:bg-gray-100/5 rounded-full mb-2"></div>
+                  <div className="w-12 h-3 md:w-16 md:h-4 bg-muted/50 dark:bg-gray-100/5 rounded"></div>
                 </div>
               ))}
             </div>
@@ -45,17 +45,17 @@ export default function Home() {
         </div>
         
         {/* Content Loading */}
-        <main className="bg-gray-50 min-h-screen">
+        <main className="bg-background min-h-screen">
           <div className="container mx-auto px-4 py-12 space-y-16">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm animate-pulse">
-                <div className="h-8 bg-gray-300 rounded w-1/3 mb-4"></div>
+              <div key={i} className="bg-card rounded-xl border border-border p-6 shadow-sm animate-pulse">
+                <div className="h-8 bg-muted/50 dark:bg-gray-100/5 rounded w-1/3 mb-4"></div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {[...Array(4)].map((_, j) => (
                     <div key={j} className="space-y-3">
-                      <div className="aspect-square bg-gray-300 rounded-lg"></div>
-                      <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                      <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                      <div className="aspect-square bg-muted/50 dark:bg-gray-100/5 rounded-lg"></div>
+                      <div className="h-4 bg-muted/50 dark:bg-gray-100/5 rounded w-3/4"></div>
+                      <div className="h-3 bg-muted/50 dark:bg-gray-100/5 rounded w-1/2"></div>
                     </div>
                   ))}
                 </div>

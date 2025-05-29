@@ -120,7 +120,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     }
 
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-background">
         {/* Main Product Section */}
         <div className="container mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
@@ -141,10 +141,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
           {/* Product Variants */}
           {product.children && product.children.length > 0 && (
             <div className="mt-12">
-              <ProductVariants 
-                variants={product.children} 
-                currentProductId={product.id} 
-              />
+              <div className="bg-muted/50 dark:bg-gray-100/5 rounded-lg p-6">
+                <ProductVariants 
+                  variants={product.children} 
+                  currentProductId={product.id} 
+                />
+              </div>
             </div>
           )}
 
@@ -152,10 +154,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
           {relatedProducts.length > 0 && (
             <div className="mt-12">
               <Separator className="mb-8" />
-              <RelatedProducts 
-                products={relatedProducts} 
-                currentProductId={product.id} 
-              />
+              <div className="bg-muted/50 dark:bg-gray-100/5 rounded-lg p-6">
+                <RelatedProducts 
+                  products={relatedProducts} 
+                  currentProductId={product.id} 
+                />
+              </div>
             </div>
           )}
         </div>

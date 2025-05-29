@@ -74,7 +74,7 @@ export default function WishlistPage() {
         {wishlist.items.map((item) => (
           <ProductCard
             key={item.id}
-            product={item.product}
+            product={item.Product}
             showAddToCart={true}
             showWishlist={true}
           />

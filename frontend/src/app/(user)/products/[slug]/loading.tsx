@@ -4,17 +4,17 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export default function ProductLoading() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Breadcrumb Skeleton */}
-      <div className="border-b">
+      <div className="border-b border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center space-x-2">
             <Skeleton className="h-4 w-12" />
-            <span className="text-gray-400">/</span>
+            <span className="text-muted-foreground">/</span>
             <Skeleton className="h-4 w-16" />
-            <span className="text-gray-400">/</span>
+            <span className="text-muted-foreground">/</span>
             <Skeleton className="h-4 w-20" />
-            <span className="text-gray-400">/</span>
+            <span className="text-muted-foreground">/</span>
             <Skeleton className="h-4 w-32" />
           </div>
         </div>
@@ -104,45 +104,49 @@ export default function ProductLoading() {
 
         {/* Variants Section Skeleton */}
         <div className="mt-12">
-          <Card>
-            <div className="p-6 space-y-4">
-              <Skeleton className="h-6 w-40" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="p-4 border rounded-lg space-y-3">
-                    <Skeleton className="h-32 w-full rounded-md" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <div className="flex justify-between">
-                      <Skeleton className="h-5 w-16" />
-                      <Skeleton className="h-4 w-12" />
+          <div className="bg-muted/50 dark:bg-gray-100/5 rounded-lg p-6">
+            <Card>
+              <div className="p-6 space-y-4">
+                <Skeleton className="h-6 w-40" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="p-4 border border-border rounded-lg space-y-3">
+                      <Skeleton className="h-32 w-full rounded-md" />
+                      <Skeleton className="h-4 w-3/4" />
+                      <div className="flex justify-between">
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
 
         {/* Related Products Skeleton */}
         <div className="mt-12 space-y-6">
-          <Skeleton className="h-8 w-48" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Card key={index}>
-                <div className="space-y-3">
-                  <Skeleton className="h-48 w-full rounded-t-lg" />
-                  <div className="p-4 space-y-3">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-3 w-20" />
-                    <div className="flex justify-between">
-                      <Skeleton className="h-5 w-16" />
-                      <Skeleton className="h-4 w-12" />
+          <div className="bg-muted/50 dark:bg-gray-100/5 rounded-lg p-6">
+            <Skeleton className="h-8 w-48" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Card key={index}>
+                  <div className="space-y-3">
+                    <Skeleton className="h-48 w-full rounded-t-lg" />
+                    <div className="p-4 space-y-3">
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-3 w-20" />
+                      <div className="flex justify-between">
+                        <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-4 w-12" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -13,30 +13,30 @@ interface ProductErrorProps {
 
 export default function ProductError({ error, reset }: ProductErrorProps) {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <Card className="max-w-lg w-full">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8 text-orange-600" />
+          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
           </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">
+          <CardTitle className="text-2xl font-bold text-foreground dark:text-white">
             Something went wrong
           </CardTitle>
         </CardHeader>
         
         <CardContent className="space-y-6 text-center">
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             We encountered an error while loading this product page. Please try again.
           </p>
           
           {process.env.NODE_ENV === 'development' && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
-              <h4 className="text-sm font-medium text-red-800 mb-2">Error Details:</h4>
-              <p className="text-xs text-red-700 font-mono break-words">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-left">
+              <h4 className="text-sm font-medium text-destructive mb-2">Error Details:</h4>
+              <p className="text-xs text-destructive/90 font-mono break-words">
                 {error.message}
               </p>
               {error.digest && (
-                <p className="text-xs text-red-600 mt-2">
+                <p className="text-xs text-destructive/70 mt-2">
                   Error ID: {error.digest}
                 </p>
               )}
@@ -57,7 +57,7 @@ export default function ProductError({ error, reset }: ProductErrorProps) {
             </Button>
           </div>
           
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             If the problem persists, please contact our support team.
           </p>
         </CardContent>

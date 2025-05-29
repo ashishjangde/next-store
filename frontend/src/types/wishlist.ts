@@ -6,12 +6,17 @@ export interface WishlistItem {
 }
 
 export interface Wishlist {
-  items: WishlistItem[];
-  total_items: number;
+  items: {
+    id: string;
+    user_id: string;
+    product_id: string;
+    Product: Product;
+  }[];
+  totalItems: number;
 }
 
 export interface RemoveFromWishlistInput {
-  wishlist_item_id: string;
+  productId: string;
 }
 
 export interface WishlistCount {

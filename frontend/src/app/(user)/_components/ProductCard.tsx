@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
+
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Product } from '@/types/product';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useCartStore } from '@/store/cart-store';
 import { useWishlistStore } from '@/store/wishlist-store';
@@ -30,21 +31,19 @@ interface ProductCardProps {
   className?: string;
 }
 
-export function ProductCard({ 
+export const ProductCard = ({ 
   product, 
   showAddToCart = true, 
   showWishlist = true,
   className = '',
-}: ProductCardProps) {
+}: ProductCardProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [isInWishlist, setIsInWishlist] = useState(false);
-  
   const { isAuthenticated } = useAuthStore();
   const { addToCart } = useCartStore();
-  const { addToWishlist, removeFromWishlist, checkInWishlist } = useWishlistStore();
+  const { addToWishlist, removeFromWishlist, isInWishlist: checkIsInWishlist } = useWishlistStore();
   
   // Handle both direct product and nested product from wishlist
   if (!product) {
@@ -67,14 +66,7 @@ export function ProductCard({
   // Handle both inventory and Inventory (backend inconsistency fallback)
   const inventory = actualProduct.inventory || (actualProduct as any).Inventory;
   const isOutOfStock = (inventory?.quantity ?? 0) === 0;
-
-  useEffect(() => {
-    const checkWishlistStatus = async () => {
-      const inWishlist = await checkInWishlist(actualProduct.id);
-      setIsInWishlist(inWishlist);
-    };
-    checkWishlistStatus();
-  }, [actualProduct.id, checkInWishlist]);
+  const isInWishlist = checkIsInWishlist(actualProduct.id);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -113,12 +105,10 @@ export function ProductCard({
     setIsAddingToWishlist(true);
     try {
       if (isInWishlist) {
-        await removeFromWishlist({ wishlist_item_id: actualProduct.id });
-        setIsInWishlist(false);
+        await removeFromWishlist({ productId: actualProduct.id });
         toast.success('Removed from wishlist');
       } else {
         await addToWishlist({ productId: actualProduct.id });
-        setIsInWishlist(true);
         toast.success('Added to wishlist');
       }
     } catch (error) {
@@ -132,12 +122,31 @@ export function ProductCard({
     setImageError(true);
   };
 
+  if (!actualProduct || !actualProduct.id || !actualProduct.title || !actualProduct.price) {
+    return null;
+  }
+
   return (
     <Link href={`/products/${actualProduct.slug}`} className={`block ${className}`}>
-      <div 
+      <motion.div 
         className="group relative overflow-hidden rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md"
+        initial={false}
+        whileHover={{ scale: 1.05 }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        style={isInWishlist ? {
+          backgroundImage: 'linear-gradient(45deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0) 100%)',
+          backgroundSize: '200% 200%',
+          backgroundPosition: isInWishlist ? '0% 0%' : '100% 100%'
+        } : undefined}
+        animate={{
+          backgroundPosition: isInWishlist ? '100% 100%' : '0% 0%'
+        }}
+        transition={{
+          duration: 2,
+          repeat: isInWishlist ? Infinity : 0,
+          repeatType: 'reverse'
+        }}
       >
         {/* Product Image - Covers full top */}
         <div className="relative h-60 w-full overflow-hidden rounded-t-lg">
@@ -173,79 +182,77 @@ export function ProductCard({
               />
             </Button>
           )}
-
-          {/* Discount Badge */}
-          {hasDiscount && (
-            <div className="absolute left-3 top-3 rounded-md bg-destructive px-2 py-1 text-xs font-semibold text-destructive-foreground">
-              -{discountPercentage}%
-            </div>
-          )}
-
-          {/* Stock Status */}
-          {isOutOfStock && (
-            <div className="absolute left-3 top-3 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-              OUT OF STOCK
-            </div>
-          )}
         </div>
 
-        {/* Content */}
-        <div className="space-y-3 p-6">
-          <div className="space-y-1">
-            <h3 className="line-clamp-2 text-base font-medium leading-snug tracking-tight text-clip">
+        {/* Product Info - Bottom */}
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-foreground line-clamp-1">
               {actualProduct.title}
             </h3>
-            {actualProduct.category && (
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                {actualProduct.category.name}
-              </p>
-            )}
           </div>
 
-          {/* Price Section - Animated */}
-          <motion.div
-            className="relative overflow-hidden"
-            animate={{
-              opacity: isHovered && showAddToCart && !isOutOfStock ? 0 : 1,
-              y: isHovered && showAddToCart && !isOutOfStock ? -10 : 0,
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="flex items-center gap-2">
-              <p className="text-lg font-semibold">
-                ₹{finalPrice.toLocaleString()}
-              </p>
-              {hasDiscount && (
-                <p className="text-sm text-muted-foreground line-through">
-                  ₹{originalPrice.toLocaleString()}
-                </p>
-              )}
+          {hasDiscount && (
+            <div className="mt-1 flex items-center">
+              <span className="text-sm font-medium text-foreground">
+                ₹{finalPrice.toFixed(2)}
+              </span>
+              <span className="ml-2 text-sm text-muted-foreground line-through">
+                ₹{originalPrice.toFixed(2)}
+              </span>
+              <span className="ml-2 text-sm font-medium text-red-500">
+                {discountPercentage}% off
+              </span>
             </div>
-          </motion.div>
+          )}
 
-          {/* Add to Cart Button - Replaces price on hover */}
-          {showAddToCart && !isOutOfStock && (
-            <motion.div
-              className="absolute inset-x-4 bottom-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{
-                opacity: isHovered ? 1 : 0,
-                y: isHovered ? 0 : 20,
-              }}
-              transition={{ duration: 0.3, delay: isHovered ? 0.1 : 0 }}
+          {!hasDiscount && (
+            <div className="mt-1">
+              <span className="text-sm font-medium text-foreground">
+                ₹{finalPrice.toFixed(2)}
+              </span>
+            </div>
+          )}
+
+          {showAddToCart && (
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "mt-2 w-full",
+                isAddingToCart && "opacity-50"
+              )}
+              onClick={handleAddToCart}
+              disabled={isAddingToCart || isOutOfStock}
             >
-              <Button
-                variant="outline"
-                onClick={handleAddToCart}
-                disabled={isAddingToCart}
-                className="w-full"
-              >
-                {isAddingToCart ? 'Adding...' : 'Add to Cart'}
-              </Button>
-            </motion.div>
+              {isAddingToCart ? (
+                <>
+                  <span className="mr-2">Adding...</span>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                </>
+              ) : isOutOfStock ? (
+                <span className="text-destructive">Out of Stock</span>
+              ) : (
+                <span>Add to Cart</span>
+              )}
+            </Button>
           )}
         </div>
-      </div>
+      </motion.div>
     </Link>
   );
 }
