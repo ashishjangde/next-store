@@ -4,8 +4,8 @@
     "description": "An awesome Next.js eCommerce project",
     "main": "index.js",
     "scripts": {
-        "dev": "concurrently \"cd frontend && npm run dev\" \"cd backend && docker-compose -f docker-compose-es.yml up -d && npm run start:dev\"",
-        "install": "concurrently \"cd frontend && npm install\" \"cd backend && npm install\"",
+        "dev": "concurrently \"cd frontend && npm run dev\" \"cd backend && docker compose -f docker-compose-es.yml up -d && npm run start:dev\"",
+        "install": "concurrently \"cd frontend && npm install --legacy-peer-deps \" \"cd backend && npm install -legacy-peer-deps && npx prisma generate\"",
         "build": "concurrently \"cd frontend && npm run build\" \"cd backend && npm run build\"",
         "start": "concurrently \"cd frontend && npm run start\" \"cd backend && npm run start:prod\""
     },
