@@ -5,7 +5,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo "Checking out branch ${env.BRANCH_NAME}..."
-                // Checkout the branch and fetch all history
                 git branch: "${env.BRANCH_NAME}",
                     url: 'https://github.com/ashishjangde/next-store.git',
                     changelog: true,
@@ -16,19 +15,33 @@ pipeline {
         stage('Determine Changes') {
             steps {
                 script {
-                    // Get all files changed in the push compared to remote branch
                     CHANGED_FILES = sh(
                         script: "git fetch origin ${env.BRANCH_NAME} && git diff --name-only origin/${env.BRANCH_NAME}...HEAD",
                         returnStdout: true
                     ).trim().split("\n")
-
-                    // Flags to decide which pipelines to run
                     RUN_FRONTEND = CHANGED_FILES.any { it.startsWith('frontend/') }
                     RUN_BACKEND = CHANGED_FILES.any { it.startsWith('backend/') }
-
                     echo "Changed files in this push: ${CHANGED_FILES}"
                     echo "Run Frontend: ${RUN_FRONTEND}"
                     echo "Run Backend: ${RUN_BACKEND}"
+                }
+            }
+        }
+
+        stage('Inject Env Files') {
+            steps {
+                script {
+                    // Inject both env files, but only if needed. Safe to inject always!
+                    // Frontend .env
+                    withCredentials([file(credentialsId: 'frontend_env', variable: 'FRONTEND_ENV')]) {
+                        sh 'cp $FRONTEND_ENV_FILE ./frontend/.env'
+                        echo "Injected frontend .env file."
+                    }
+                    // Backend .env
+                    withCredentials([file(credentialsId: 'backend_env_file', variable: 'BACKEND_ENV_FILE')]) {
+                        sh 'cp $BACKEND_ENV_FILE ./backend/.env'
+                        echo "Injected backend .env file."
+                    }
                 }
             }
         }
@@ -49,7 +62,6 @@ pipeline {
                         }
                     }
                 }
-
                 stage('Backend Pipeline') {
                     when {
                         expression { return RUN_BACKEND }
