@@ -4,12 +4,6 @@ import { ProductListResponse, ProductTypeEnum } from "@/types/product";
 
 
 export const ProductActions = {
-  /**
-   * Create a new product
-   * @param productData Product data with images
-   * @param cookies Optional cookies for server-side requests
-   * @returns The created product
-   */
   createProduct: async (
     productData: ProductCreateInput,
     cookies?: string
@@ -51,12 +45,6 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Get all products with pagination and optional filtering
-   * @param params Search and filtering parameters
-   * @param cookies Optional cookies for server-side requests
-   * @returns List of products with pagination info
-   */
   getAllProducts: async (
     params: {
       page?: number;
@@ -87,13 +75,7 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Get a product by ID or slug
-   * @param idOrSlug Product ID or slug
-   * @param includeOptions Additional data to include
-   * @param cookies Optional cookies for server-side requests
-   * @returns The requested product
-   */
+ 
   getProductById: async (
     idOrSlug: string,
     includeOptions: {
@@ -119,13 +101,7 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Get a product by slug
-   * @param slug Product slug
-   * @param includeOptions Additional data to include
-   * @param cookies Optional cookies for server-side requests
-   * @returns The requested product
-   */
+
   getProductBySlug: async (
     slug: string,
     includeOptions: {
@@ -151,13 +127,7 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Update an existing product
-   * @param id Product ID
-   * @param productData Updated product data
-   * @param cookies Optional cookies for server-side requests
-   * @returns The updated product
-   */
+
   updateProduct: async (
     id: string,
     productData: ProductUpdateInput,
@@ -200,12 +170,7 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Delete a product
-   * @param id Product ID
-   * @param cookies Optional cookies for server-side requests
-   * @returns Success message
-   */
+ 
   deleteProduct: async (
     id: string,
     cookies?: string
@@ -220,13 +185,7 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Add an attribute to a product
-   * @param productId Product ID
-   * @param attributeValueId Attribute value ID
-   * @param cookies Optional cookies for server-side requests
-   * @returns Updated product
-   */
+
   addAttributeToProduct: async (
     productId: string,
     attributeValueId: string,
@@ -243,13 +202,6 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Remove an attribute from a product
-   * @param productId Product ID
-   * @param attributeValueId Attribute value ID
-   * @param cookies Optional cookies for server-side requests
-   * @returns Updated product
-   */
   removeAttributeFromProduct: async (
     productId: string,
     attributeValueId: string,
@@ -263,12 +215,7 @@ export const ProductActions = {
     );
       return response.data;
   },
-  /**
-   * Get vendor parent products (products without parent)
-   * @param params Search and filtering parameters
-   * @param cookies Optional cookies for server-side requests
-   * @returns List of vendor parent products with pagination info
-   */
+
   getVendorParentProducts: async (
     params: {
       page?: number;
@@ -305,13 +252,6 @@ export const ProductActions = {
     return response.data;
   },
 
-  /**
-   * Get a vendor product by ID
-   * @param id Product ID
-   * @param includeOptions Additional data to include
-   * @param cookies Optional cookies for server-side requests
-   * @returns The requested vendor product
-   */
   getVendorProductById: async (
     id: string,
     includeOptions: {

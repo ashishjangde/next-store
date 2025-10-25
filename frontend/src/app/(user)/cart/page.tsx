@@ -66,7 +66,7 @@ export default function CartPage() {
   // Calculate totals
   const totalItems = cart.items.length;
   const totalPrice = cart.items.reduce((total, item) => {
-    const product = item.Product;
+    const product = item.product;
     if (!product) return total;
     
     const price = product.discount_price ?? product.price ?? 0;
@@ -90,18 +90,18 @@ export default function CartPage() {
               <div key={item.id} className="flex gap-4">
                 <div className="w-24 h-24 relative">
                   <img
-                    src={item.Product?.images?.[0] || '/placeholder.png'}
-                    alt={item.Product?.title || 'Product'}
+                    src={item.product?.images?.[0] || '/placeholder.png'}
+                    alt={item.product?.title || 'Product'}
                     className="object-cover rounded-md"
                   />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-medium">{item.Product?.title}</h3>
+                  <h3 className="font-medium">{item.product?.title}</h3>
                   <p className="text-sm text-muted-foreground">
                     Quantity: {item.quantity}
                   </p>
                   <p className="font-medium">
-                    {formatPrice(item.Product?.discount_price ?? item.Product?.price ?? 0)}
+                    {formatPrice(item.product?.discount_price ?? item.product?.price ?? 0)}
                   </p>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as dotenv from 'dotenv';
 
 @Injectable()
 class ConfigService {
@@ -6,6 +7,7 @@ class ConfigService {
   private readonly logger = new Logger(ConfigService.name);
 
   constructor() {
+    dotenv.config(); // Load .env file
     this.envConfig = process.env;
   }
 

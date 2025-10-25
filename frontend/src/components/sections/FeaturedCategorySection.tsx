@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight } from 'lucide-react';
 import { Product } from '@/types/product';
-import { ProductCard } from '@/components/product/ProductCard';
+import { ProductCard } from '@/app/(user)/_components/ProductCard';
 
 interface CategorySection {
   id: string;

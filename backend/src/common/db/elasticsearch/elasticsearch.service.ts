@@ -5,7 +5,9 @@ import ConfigService from '../../config/config.service';
 @Injectable()
 export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
   private client: Client;
-  private readonly logger = new Logger(ElasticsearchService.name);  constructor(private readonly configService: ConfigService) {
+  private readonly logger = new Logger(ElasticsearchService.name);  
+  
+  constructor(private readonly configService: ConfigService) {
     this.client = new Client({
       node: this.configService.get('ELASTICSEARCH_NODE'),
       // Configure the client to be compatible with Elasticsearch 8.x
@@ -114,7 +116,8 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
       index: indexName,
       id,
     });
-  }  async search(index: string, query: any): Promise<any> {
+  }  
+  async search(index: string, query: any): Promise<any> {
     const indexName = this.getIndexName(index);
     
     try {
@@ -126,7 +129,8 @@ export class ElasticsearchService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Error searching documents: ${error.message}`, error);
       throw error;
     }
-  }  async bulkIndex(index: string, documents: Array<{ id: string; doc: any }>): Promise<void> {
+  }  
+  async bulkIndex(index: string, documents: Array<{ id: string; doc: any }>): Promise<void> {
     const indexName = this.getIndexName(index);
     
     const operations = documents.flatMap(({ id, doc }) => [
