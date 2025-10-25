@@ -28,35 +28,39 @@ pipeline {
             steps {
                 script {
                     def branchName = env.BRANCH_NAME ?: 'master'
-                    CHANGED_FILES = sh(
+                    def changedFiles = sh(
                         script: "git fetch origin ${branchName} && git diff --name-only origin/${branchName}...HEAD",
                         returnStdout: true
                     ).trim().split("\n")
 
                     // Detect which services changed
-                    RUN_FRONTEND = CHANGED_FILES.any { it.startsWith('frontend/') }
-                    RUN_BACKEND = CHANGED_FILES.any { it.startsWith('backend/') }
+                    def runFrontend = changedFiles.any { it.startsWith('frontend/') }
+                    def runBackend = changedFiles.any { it.startsWith('backend/') }
 
                     // Apply manual override
                     if (params.DEPLOY_TARGET == 'frontend') {
                         echo "⚠️ Manually forcing FRONTEND deploy"
-                        RUN_FRONTEND = true
-                        RUN_BACKEND = false
+                        runFrontend = true
+                        runBackend = false
                     } else if (params.DEPLOY_TARGET == 'backend') {
                         echo "⚠️ Manually forcing BACKEND deploy"
-                        RUN_FRONTEND = false
-                        RUN_BACKEND = true
+                        runFrontend = false
+                        runBackend = true
                     } else if (params.DEPLOY_TARGET == 'both') {
                         echo "⚠️ Manually forcing BOTH frontend & backend deploy"
-                        RUN_FRONTEND = true
-                        RUN_BACKEND = true
+                        runFrontend = true
+                        runBackend = true
                     } else {
                         echo "🧠 Auto mode — using detected file changes"
                     }
 
-                    echo "Changed files in this push: ${CHANGED_FILES}"
-                    echo "Run Frontend: ${RUN_FRONTEND}"
-                    echo "Run Backend: ${RUN_BACKEND}"
+                    // Store in environment variables for use in when conditions
+                    env.RUN_FRONTEND = runFrontend.toString()
+                    env.RUN_BACKEND = runBackend.toString()
+
+                    echo "Changed files in this push: ${changedFiles}"
+                    echo "Run Frontend: ${env.RUN_FRONTEND}"
+                    echo "Run Backend: ${env.RUN_BACKEND}"
                 }
             }
         }
@@ -81,7 +85,7 @@ pipeline {
             parallel {
                 stage('Frontend Pipeline') {
                     when {
-                        expression { return RUN_FRONTEND }
+                        expression { env.RUN_FRONTEND == 'true' }
                     }
                     steps {
                         echo "🚀 Building and deploying Frontend..."
@@ -93,28 +97,63 @@ pipeline {
                                 docker run -d \
                                 --name nextstore_frontend_container \
                                 -p 3000:3000 \
+                                --restart unless-stopped \
                                 nextstore_frontend:${env.BUILD_NUMBER}
                             """
+
+                            sleep(time: 5, unit: 'SECONDS')
+                            def containerStatus = sh(
+                                script: "docker ps -q -f name=nextstore_frontend_container",
+                                returnStdout: true
+                            ).trim()
+
+                            if (!containerStatus) {
+                                echo "❌ Container failed to start! Checking logs..."
+                                sh "docker logs nextstore_frontend_container"
+                                error("Frontend container failed to start")
+                            } else {
+                                echo "✅ Frontend container is running"
+                                sh "docker logs --tail 20 nextstore_frontend_container"
+                            }
                         }
                     }
                 }
 
                 stage('Backend Pipeline') {
                     when {
-                        expression { return RUN_BACKEND }
+                        expression { env.RUN_BACKEND == 'true' }
                     }
                     steps {
-                        echo "🚀 Building and deploying Backend..."
-                        script {
-                            def dockerImage = docker.build("nextstore_backend:${env.BUILD_NUMBER}", "./backend")
-                            sh "docker stop nextstore_backend_container || true"
-                            sh "docker rm nextstore_backend_container || true"
-                            sh """
-                                docker run -d \
-                                --name nextstore_backend_container \
-                                -p 8000:8000 \
-                                nextstore_backend:${env.BUILD_NUMBER}
-                            """
+                        echo "🚀 Building and deploying Backend with Docker Compose..."
+                        dir('backend') {
+                            // Stop and remove existing containers
+                            sh 'docker compose -f docker-compose-es.yml down || true'
+                            
+                            // Build and start services
+                            sh 'docker compose -f docker-compose-es.yml up -d --build'
+                            
+                            // Wait for services to be ready
+                            sleep(time: 10, unit: 'SECONDS')
+                            
+                            // Check container status
+                            sh 'docker compose -f docker-compose-es.yml ps'
+                            
+                            // Verify backend container is running
+                            script {
+                                def containerStatus = sh(
+                                    script: "docker ps -q -f name=nextstore_backend_container",
+                                    returnStdout: true
+                                ).trim()
+
+                                if (!containerStatus) {
+                                    echo "❌ Backend container failed to start! Checking logs..."
+                                    sh "docker logs nextstore_backend_container || true"
+                                    error("Backend container failed to start")
+                                } else {
+                                    echo "✅ Backend container is running"
+                                    sh "docker logs --tail 20 nextstore_backend_container"
+                                }
+                            }
                         }
                     }
                 }

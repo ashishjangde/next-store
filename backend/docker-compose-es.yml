@@ -32,5 +32,17 @@ services:
       - elasticsearch
     restart: unless-stopped
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nextstore_backend_container
+    env_file:
+      - .env
+    network_mode: host
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
 volumes:
   elasticsearch_data:
