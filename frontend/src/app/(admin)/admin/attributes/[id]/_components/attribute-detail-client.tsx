@@ -51,7 +51,7 @@ export const AttributeDetailClient = ({
         <Button 
           variant="outline" 
           className="mt-4"
-          onClick={() => router.push("/admin/dashboard/attributes")}
+          onClick={() => router.push("/admin/attributes")}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Attributes
@@ -84,7 +84,7 @@ export const AttributeDetailClient = ({
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => router.push("/admin/dashboard/attributes")}
+                onClick={() => router.push("/admin/attributes")}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back
@@ -100,7 +100,7 @@ export const AttributeDetailClient = ({
               </EditAttributeModal>
               <AttributeDeleteDialog 
                 attribute={attribute} 
-                onSuccess={() => router.push("/admin/dashboard/attributes")}
+                onSuccess={() => router.push("/admin/attributes")}
               >
                 <Button variant="destructive">
                   <Trash2 className="mr-2 h-4 w-4" />

@@ -52,7 +52,6 @@ export class MulterS3ConfigService {
               Key: uploadPath,
               Body: buffer,
               ContentType: file.mimetype,
-              ACL:"public-read"
             });
 
             await s3Client.send(command);

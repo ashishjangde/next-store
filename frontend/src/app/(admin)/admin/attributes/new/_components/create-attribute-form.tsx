@@ -59,10 +59,10 @@ export const CreateAttributeForm = () => {
       
       if (isAddingValues && response.data) {
         // Navigate to the attribute detail page to add values
-        router.push(`/admin/dashboard/attributes/${response.data.id}`);
+        router.push(`/admin/attributes/${response.data.id}`);
       } else {
         // Navigate back to the attributes list
-        router.push("/admin/dashboard/attributes");
+        router.push("/admin/attributes");
       }
     },
     onError: (error: any) => {

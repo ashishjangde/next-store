@@ -41,7 +41,7 @@ export const AttributeActionsDropdown = ({ attribute }: AttributeActionsDropdown
         <DropdownMenuSeparator />
         
         <DropdownMenuItem asChild>
-          <Link href={`/admin/dashboard/attributes/${attribute.id}`}>
+          <Link href={`/admin/attributes/${attribute.id}`}>
             <span className="flex items-center">
               <Edit className="mr-2 h-4 w-4" /> View & Edit
             </span>

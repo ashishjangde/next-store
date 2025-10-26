@@ -70,7 +70,7 @@ export function AttributesClient() {
         description="Manage product attributes in your store"
         actions={
           <Button asChild>
-            <Link href="/admin/dashboard/attributes/new">
+            <Link href="/admin/attributes/new">
               <Plus className="mr-2 h-4 w-4" />
               Add New
             </Link>

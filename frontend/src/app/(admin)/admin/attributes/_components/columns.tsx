@@ -46,7 +46,7 @@ export const AttributeColumns: ColumnDef<Attribute>[] = [
 		cell: ({ row }) => (
 			<div className="font-medium">
 				<Link
-					href={`/admin/dashboard/attributes/${row.original.id}`}
+					href={`/admin/attributes/${row.original.id}`}
 					className="hover:underline text-blue-600"
 				>
 					{row.getValue("name")}

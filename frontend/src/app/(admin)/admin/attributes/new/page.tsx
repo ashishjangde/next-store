@@ -18,7 +18,7 @@ export default function CreateAttributePage() {
         description="Add a new attribute to your product catalog"
         actions={
           <Button variant="outline" asChild>
-            <Link href="/admin/dashboard/attributes">
+            <Link href="/admin/attributes">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Attributes
             </Link>

@@ -23,7 +23,9 @@ export class S3Service {
     
     const endpointUrl = new URL(`https://${this.endpoint}`);
     const host = endpointUrl.host;
-    const region = host.split('.')[0]; // Correctly extract 'in-maa-1'
+    
+    // Get region from config or extract from endpoint
+    const region = this.configService.get('S3_REGION') || host.split('.')[1] || 'us-east-1';
 
     this.logger.debug(`Initializing S3 client with: 
       Bucket: ${this.bucketName}
@@ -76,7 +78,6 @@ export class S3Service {
         Key: uploadPath,
         Body: file.buffer,
         ContentType: file.mimetype,
-        ACL: 'public-read'
       });
 
       await this.s3Client.send(command);

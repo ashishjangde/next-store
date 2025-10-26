@@ -99,13 +99,13 @@ export function AttributeTable({
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/admin/dashboard/attributes/${attribute.id}`}>
+                        <Link href={`/admin/attributes/${attribute.id}`}>
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">View</span>
                         </Link>
                       </Button>
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/admin/dashboard/attributes/${attribute.id}/edit`}>
+                        <Link href={`/admin/attributes/${attribute.id}/edit`}>
                           <Edit className="h-4 w-4" />
                           <span className="sr-only">Edit</span>
                         </Link>
